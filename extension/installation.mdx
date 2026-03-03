@@ -1,0 +1,218 @@
+---
+title: Installation Guide
+description: Step-by-step instructions for installing and loading the Film Grade Chrome extension in developer mode.
+---
+
+## Installation Methods
+
+The Film Grade extension can be installed in Chrome through two methods: loading as an unpacked extension for development, or installing from the Chrome Web Store once published.
+
+## Development Installation
+
+Load the extension in developer mode to test local changes or use the development version.
+
+<Steps>
+  <Step title="Build the Extension">
+    First, navigate to the extension directory and install dependencies:
+    
+    <CodeGroup>
+    ```bash pnpm
+    cd ~/workspace/source/Color-grader-chrome/film-grade-website
+    pnpm install
+    pnpm build
+    ```
+    
+    ```bash npm
+    cd ~/workspace/source/Color-grader-chrome/film-grade-website
+    npm install
+    npm run build
+    ```
+    </CodeGroup>
+    
+    This creates a production bundle in the `build/chrome-mv3-prod` directory.
+  </Step>
+  
+  <Step title="Open Chrome Extensions">
+    Navigate to Chrome's extensions page:
+    - Enter `chrome://extensions` in the address bar, or
+    - Click the three-dot menu → Extensions → Manage Extensions
+    
+    <Tip>
+    Screenshot would show: Chrome extensions page with "Developer mode" toggle in the top right
+    </Tip>
+  </Step>
+  
+  <Step title="Enable Developer Mode">
+    Toggle the "Developer mode" switch in the top-right corner of the extensions page.
+    
+    This reveals three new buttons: "Load unpacked", "Pack extension", and "Update".
+  </Step>
+  
+  <Step title="Load the Extension">
+    Click "Load unpacked" and select the build directory:
+    
+    ```
+    ~/workspace/source/Color-grader-chrome/film-grade-website/build/chrome-mv3-prod
+    ```
+    
+    The extension should now appear in your extensions list with the Film Grade icon.
+  </Step>
+  
+  <Step title="Pin the Extension">
+    Click the puzzle piece icon in the Chrome toolbar and pin Film Grade for easy access.
+    
+    <Tip>
+    Screenshot would show: The extensions menu with Film Grade pinned
+    </Tip>
+  </Step>
+</Steps>
+
+## Development Server
+
+For active development with hot reload:
+
+<Steps>
+  <Step title="Start Dev Server">
+    Run the development server:
+    
+    <CodeGroup>
+    ```bash pnpm
+    pnpm dev
+    ```
+    
+    ```bash npm
+    npm run dev
+    ```
+    </CodeGroup>
+    
+    This creates a development build in `build/chrome-mv3-dev` with auto-reload enabled.
+  </Step>
+  
+  <Step title="Load Dev Build">
+    Load the development build directory in Chrome (same process as above):
+    
+    ```
+    ~/workspace/source/Color-grader-chrome/film-grade-website/build/chrome-mv3-dev
+    ```
+  </Step>
+  
+  <Step title="Make Changes">
+    Edit source files like `popup.tsx`, `content.ts`, or files in the `contents/` directory.
+    
+    The extension will automatically reload when you save changes.
+  </Step>
+</Steps>
+
+<Note>
+Changes to content scripts require a page refresh to take effect on already-loaded pages.
+</Note>
+
+## First Use
+
+After installation, test the extension:
+
+<Steps>
+  <Step title="Navigate to a Website">
+    Open any website with images, such as:
+    - A photography portfolio
+    - An e-commerce site
+    - A news website with photo galleries
+  </Step>
+  
+  <Step title="Open the Extension Popup">
+    Click the Film Grade icon in your Chrome toolbar.
+    
+    <Tip>
+    Screenshot would show: The Film Grade popup interface with preset options
+    </Tip>
+  </Step>
+  
+  <Step title="Select a Preset">
+    Choose a film preset from the options:
+    - **None**: No color grading applied
+    - **Fuji Film**: Warm, slightly desaturated look
+    - **Kodak Film**: Vibrant with enhanced saturation
+    - **Greyscale**: Black and white conversion (debug)
+  </Step>
+  
+  <Step title="Toggle Effects">
+    Enable optional effects for enhanced film aesthetics:
+    - **Film Grain**: Adds texture and analog feel
+    - **Vignette**: Darkens edges to focus attention
+    
+    <Note>
+    Effects are only available when a preset other than "None" is selected.
+    </Note>
+  </Step>
+  
+  <Step title="View Results">
+    Watch as the extension processes images on the page. A progress indicator shows processing status.
+    
+    Toggle the extension on/off using the switch at the top of the popup to compare before and after.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Extension Not Working
+
+If the extension doesn't process images:
+
+<AccordionGroup>
+  <Accordion title="Content Script Not Loaded">
+    **Problem**: The content script may not be injected on the current page.
+    
+    **Solutions**:
+    1. Click "Check Content Script" in the Debug Tools section of the popup
+    2. If it fails, try "Force Inject Content Script"
+    3. Reload the page after injection
+    4. Check that the website URL starts with `http://` or `https://`
+  </Accordion>
+  
+  <Accordion title="No Images Detected">
+    **Problem**: The extension may not find processable images on the page.
+    
+    **Solutions**:
+    1. Ensure images are loaded and visible
+    2. Check that images aren't SVGs (which are intentionally skipped)
+    3. Verify images are larger than 30x30 pixels
+    4. Try scrolling to bring images into viewport
+  </Accordion>
+  
+  <Accordion title="CORS Errors">
+    **Problem**: Images from external domains may block canvas access.
+    
+    **Solutions**:
+    1. The extension automatically attempts to proxy blocked images
+    2. Check console for specific CORS errors (`F12` → Console tab)
+    3. Some CDN configurations may block all access attempts
+  </Accordion>
+</AccordionGroup>
+
+### Debug Tools
+
+The popup includes built-in debugging features:
+
+| Tool | Purpose |
+|------|---------|
+| **Check Content Script** | Verifies the content script is active on the current page |
+| **Force Inject Content Script** | Manually injects the content script if auto-injection failed |
+| **Reload Page** | Refreshes the current page to restart processing |
+| **Check LUT File** | Verifies the selected LUT file can be loaded |
+| **Apply Filter Directly** | Bypasses normal flow to directly trigger image processing |
+| **Show Test Image** | Displays a test image with current settings applied |
+
+## Permissions
+
+The extension requires these Chrome permissions:
+
+| Permission | Purpose |
+|------------|---------|
+| **storage** | Save preset and effect preferences synced across devices |
+| **activeTab** | Access the currently visible tab to process images |
+| **scripting** | Inject content scripts into web pages |
+| **host_permissions (https://\*/\*)** | Access HTTPS websites to process images |
+
+<Note>
+The extension only processes images on the current tab when you activate it. It does not collect, store, or transmit any personal data or browsing history.
+</Note>

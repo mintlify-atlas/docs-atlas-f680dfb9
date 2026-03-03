@@ -1,0 +1,193 @@
+---
+title: ColorGrader.apply()
+description: Apply color grading to specific target images
+---
+
+## Signature
+
+```typescript
+ColorGrader.apply(options: ApplyOptions): Promise<HTMLImageElement | NodeListOf<HTMLImageElement> | null>
+```
+
+## Description
+
+Applies color grading to specific target images. This method provides fine-grained control over which images receive color grading and allows you to:
+
+- Target individual images, NodeLists, or CSS selectors
+- Use built-in presets or custom LUTs
+- Override default strength settings
+- Apply direct LUT data without loading presets
+
+## Parameters
+
+<ParamField path="options" type="ApplyOptions" required>
+  Configuration options for applying color grading
+
+  <Expandable title="ApplyOptions properties">
+    <ParamField path="target" type="HTMLImageElement | NodeListOf<HTMLImageElement> | string" required>
+      The target image(s) to apply color grading to. Can be:
+      - A single `HTMLImageElement`
+      - A `NodeListOf<HTMLImageElement>` (e.g., from `querySelectorAll`)
+      - A CSS selector string (e.g., `'.hero-image'`, `'#main-photo'`)
+    </ParamField>
+
+    <ParamField path="mode" type="string" optional>
+      Preset name or custom LUT handle to apply. Built-in presets: `normal`, `vintage`, `cinematic`, `serious-vintage`, `lights-out`, `sci-fi`. If omitted, uses the current default mode set via `init()` or `setMode()`
+    </ParamField>
+
+    <ParamField path="lut" type="ParsedLut" optional>
+      Direct LUT data object. When provided, this overrides the `mode` parameter. Use this for applying custom LUTs directly without loading from presets
+    </ParamField>
+
+    <ParamField path="strength" type="number" optional>
+      Blend strength for the color grading effect. Range: 0-1 where 0 is no effect and 1 is full strength. If omitted, uses the current default strength
+    </ParamField>
+
+    <ParamField path="scope" type="string" optional>
+      Internal scope identifier (reserved for future use)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="result" type="Promise<HTMLImageElement | NodeListOf<HTMLImageElement> | null>">
+  A Promise that resolves to:
+  - The processed `HTMLImageElement` if a single image was targeted
+  - A `NodeListOf<HTMLImageElement>` if multiple images were targeted
+  - `null` if the target was invalid or processing failed
+</ResponseField>
+
+## Examples
+
+### Apply to Single Element
+
+```javascript
+const heroImage = document.getElementById('hero');
+await ColorGrader.apply({ 
+  target: heroImage, 
+  mode: 'vintage',
+  strength: 0.7
+});
+```
+
+### Apply to Multiple Elements
+
+```javascript
+const galleryImages = document.querySelectorAll('.gallery img');
+await ColorGrader.apply({ 
+  target: galleryImages, 
+  mode: 'cinematic'
+});
+```
+
+### Apply Using CSS Selector
+
+```javascript
+await ColorGrader.apply({ 
+  target: '.product-image', 
+  mode: 'serious-vintage',
+  strength: 0.5
+});
+```
+
+### Apply Custom LUT Directly
+
+```javascript
+import { parseCubeFile } from 'web-luts';
+
+const cubeData = await fetch('/my-lut.cube').then(r => r.text());
+const lut = parseCubeFile(cubeData);
+
+await ColorGrader.apply({ 
+  target: '#hero-image',
+  lut: lut,
+  strength: 0.9
+});
+```
+
+### Use Default Mode and Strength
+
+```javascript
+// Uses defaults set via init() or setMode()/setStrength()
+await ColorGrader.apply({ 
+  target: document.querySelector('.featured-image')
+});
+```
+
+## Behavior
+
+### Asynchronous Processing
+
+The method is asynchronous because it may need to:
+- Load preset LUT files from the network
+- Wait for images to complete loading
+- Process large images with WebGL
+
+### Image Loading
+
+If target images are not yet fully loaded (`image.complete === false`):
+- The method sets up a load event listener
+- Color grading is applied automatically when the image loads
+- The promise resolves immediately with the image element
+
+### CORS Handling
+
+For external images (cross-origin):
+- The method automatically adds `crossorigin="anonymous"` attribute if missing
+- If the image is already loaded, it triggers a reload to apply the CORS attribute
+- This is required for WebGL texture access
+
+### Preset Resolution
+
+The method resolves LUTs in this priority order:
+1. Direct `lut` parameter (highest priority)
+2. `mode` parameter
+3. Default mode set via `init()` or `setMode()`
+
+### Custom LUT Modes
+
+You can use custom LUT handles returned from `loadCustomCube()` as the `mode` value:
+
+```javascript
+const customHandle = await ColorGrader.loadCustomCube('/my-lut.cube');
+
+await ColorGrader.apply({ 
+  target: '.hero',
+  mode: customHandle
+});
+```
+
+## Notes
+
+<Warning>
+  External images must have CORS enabled on the server. The library will warn and attempt to add `crossorigin="anonymous"`, but the server must respond with appropriate CORS headers.
+</Warning>
+
+<Note>
+  For best performance, preload LUTs using `init({ autoload: true })` or by calling `apply()` with each mode during application initialization.
+</Note>
+
+## Error Handling
+
+```javascript
+try {
+  const result = await ColorGrader.apply({ 
+    target: '#hero',
+    mode: 'cinematic'
+  });
+  
+  if (result === null) {
+    console.log('Failed to apply color grading');
+  }
+} catch (error) {
+  console.error('Error applying color grading:', error);
+}
+```
+
+## See Also
+
+- [init()](/api/init) - Initialize automatic color grading
+- [setMode()](/api/set-mode) - Change the default mode
+- [setStrength()](/api/set-strength) - Change the default strength
+- [loadCustomCube()](/api/load-custom-cube) - Load custom LUT files

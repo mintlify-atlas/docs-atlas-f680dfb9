@@ -1,0 +1,193 @@
+---
+title: Basic Usage
+description: Learn the fundamental patterns for applying color grading to images with Web LUTs
+---
+
+## Quick Start
+
+Web LUTs provides two primary ways to apply color grading: automatic initialization for all images, or targeted application to specific elements.
+
+### Global Initialization
+
+The simplest way to apply color grading is to initialize the library on page load:
+
+```js
+import { ColorGrader } from 'web-luts';
+
+ColorGrader.init({ 
+  mode: 'cinematic',
+  strength: 0.8,
+  selector: 'img',
+  autoload: true
+});
+```
+
+This automatically:
+- Applies the `cinematic` preset to all `<img>` elements
+- Sets the blending strength to 80%
+- Preloads all preset LUTs in the background
+- Watches for new images added to the DOM via MutationObserver
+
+See src/index.ts:33 for the full initialization implementation.
+
+### Targeted Application
+
+For more control, apply color grading to specific images:
+
+```js
+const heroImage = document.getElementById('hero');
+
+await ColorGrader.apply({ 
+  target: heroImage, 
+  mode: 'vintage',
+  strength: 1.0
+});
+```
+
+The `target` parameter accepts:
+- A single `HTMLImageElement`
+- A `NodeListOf<HTMLImageElement>`
+- A CSS selector string (e.g., `'.gallery img'`)
+
+## Changing Modes
+
+<Steps>
+  <Step title="Switch the active LUT preset">
+    Use `setMode()` to change the color grading look:
+    
+    ```js
+    // Change the hero image to vintage look
+    await ColorGrader.setMode('vintage', heroImage);
+    
+    // Change all images
+    await ColorGrader.setMode('cinematic');
+    ```
+  </Step>
+  
+  <Step title="Wire up to UI controls">
+    Connect mode changes to radio buttons or dropdown menus:
+    
+    ```js
+    document.querySelectorAll('input[name="mode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        ColorGrader.setMode(e.target.value);
+      });
+    });
+    ```
+    
+    See examples/index.html:243 for a complete working example.
+  </Step>
+</Steps>
+
+## Adjusting Strength
+
+The strength parameter controls how much of the LUT effect is blended with the original image (0 = no effect, 1 = full effect):
+
+```js
+// Subtle effect at 50%
+await ColorGrader.setStrength(0.5, heroImage);
+
+// Full effect at 100%
+await ColorGrader.setStrength(1.0, heroImage);
+```
+
+### Interactive Strength Slider
+
+```js
+const slider = document.getElementById('strength-slider');
+
+slider.addEventListener('input', (e) => {
+  const strength = parseFloat(e.target.value);
+  ColorGrader.setStrength(strength);
+});
+```
+
+Strength is applied in the fragment shader during color lookup, ensuring smooth transitions. See src/core/glEngine.ts:505 for the shader uniform setup.
+
+## Applying to Multiple Images
+
+Use CSS selectors to target multiple images at once:
+
+```js
+// Apply to all images in a gallery
+await ColorGrader.apply({
+  target: '.image-gallery img',
+  mode: 'serious-vintage',
+  strength: 0.9
+});
+
+// Apply to images with a data attribute
+await ColorGrader.apply({
+  target: 'img[data-grade]',
+  mode: 'lights-out'
+});
+```
+
+The library processes each image individually in the NodeList. See src/core/apply.ts:30 for the iteration logic.
+
+## Resetting Images
+
+Restore images to their original, unprocessed state:
+
+```js
+// Reset a single image
+ColorGrader.reset(heroImage);
+
+// Reset all images
+ColorGrader.reset();
+
+// Reset by selector
+ColorGrader.reset('.gallery img');
+```
+
+<Warning>
+  The original image source is stored in a WeakMap when first processed (src/core/apply.ts:87). If you manually change the image `src` after applying a LUT, the reset will restore to the first processed source, not the manually changed one.
+</Warning>
+
+## Built-in Presets
+
+Web LUTs includes six built-in presets:
+
+- **`normal`** - No color grading (identity LUT)
+- **`vintage`** - Warm, faded film look with reduced blues
+- **`cinematic`** - Hollywood-style teal shadows and orange highlights
+- **`serious-vintage`** - Stronger vintage with more contrast
+- **`lights-out`** - Dark, moody look with blue-tinted shadows
+- **`sci-fi`** - Cool blue-green tint
+
+See src/presets/index.ts:95 for the programmatic fallback implementations of each preset.
+
+## Working with Dynamic Content
+
+When you use `init()`, a MutationObserver automatically processes new images added to the page:
+
+```js
+ColorGrader.init({
+  selector: 'img[data-grade]',
+  mode: 'cinematic'
+});
+
+// This new image will automatically get processed
+const newImage = document.createElement('img');
+newImage.src = 'photo.jpg';
+newImage.setAttribute('data-grade', '');
+document.body.appendChild(newImage);
+```
+
+The observer is set up in src/index.ts:298 with `childList: true` and `subtree: true` to catch all additions.
+
+## Cleaning Up
+
+When you're done with color grading (e.g., in a single-page app), properly dispose of resources:
+
+```js
+ColorGrader.dispose();
+```
+
+This:
+- Resets all processed images
+- Releases all WebGL resources and textures
+- Clears the custom LUT cache
+- Resets internal state
+
+See src/index.ts:250 for the full disposal implementation.

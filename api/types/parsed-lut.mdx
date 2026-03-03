@@ -1,0 +1,46 @@
+---
+title: ParsedLut
+description: Represents a parsed LUT (Look-Up Table) containing color transformation data.
+---
+
+The `ParsedLut` interface represents a parsed LUT (Look-Up Table) used for color grading transformations.
+
+## Properties
+
+<ParamField path="size" type="number" required>
+  The dimension of the 3D LUT cube. For example, a size of `33` represents a 33×33×33 cube with 35,937 color mapping points.
+  
+  Common sizes are 17, 33, or 65.
+</ParamField>
+
+<ParamField path="title" type="string" optional>
+  An optional descriptive title for the LUT, typically extracted from the TITLE field in a .cube file.
+</ParamField>
+
+<ParamField path="data" type="Float32Array | number[][]" required>
+  The color transformation data for the LUT. Can be either:
+  - `Float32Array` - A flat array of RGB values
+  - `number[][]` - An array of RGB triplets, where each entry is `[r, g, b]`
+  
+  The total number of entries should equal `size³` (size cubed).
+  
+  Each RGB value is normalized to the range 0-1.
+</ParamField>
+
+## Usage Example
+
+```typescript
+import { parseCubeFile, type ParsedLut } from 'web-luts';
+
+const cubeContent = `
+TITLE "My Custom LUT"
+LUT_3D_SIZE 17
+0.0 0.0 0.0
+...
+`;
+
+const lut: ParsedLut = parseCubeFile(cubeContent);
+console.log(lut.size);  // 17
+console.log(lut.title); // "My Custom LUT"
+console.log(lut.data.length); // 4913 (17³)
+```

@@ -1,0 +1,150 @@
+---
+title: "Presets API"
+description: "Built-in LUT presets for quick visual effects"
+---
+
+## Overview
+
+Web LUTs includes several built-in LUT presets that provide instant visual effects. Each preset is a pre-configured color lookup table that can be applied to images or videos.
+
+## PRESETS Constant
+
+The `PRESETS` constant contains all available preset names:
+
+```typescript
+import { PRESETS } from 'web-luts';
+
+console.log(PRESETS.NORMAL);          // 'normal'
+console.log(PRESETS.VINTAGE);         // 'vintage'
+console.log(PRESETS.CINEMATIC);       // 'cinematic'
+console.log(PRESETS.SERIOUS_VINTAGE); // 'serious-vintage'
+console.log(PRESETS.LIGHTS_OUT);      // 'lights-out'
+console.log(PRESETS.SCI_FI);          // 'sci-fi'
+```
+
+## Available Presets
+
+<ResponseField name="PRESETS.NORMAL" type="string" default="'normal'">
+  Identity LUT with no color transformation. Use this as a baseline or to reset effects.
+</ResponseField>
+
+<ResponseField name="PRESETS.VINTAGE" type="string" default="'vintage'">
+  Warm, faded look with boosted reds, slightly reduced greens, and desaturated blues. Creates a nostalgic, retro aesthetic.
+</ResponseField>
+
+<ResponseField name="PRESETS.CINEMATIC" type="string" default="'cinematic'">
+  Teal shadows with orange highlights. The classic Hollywood color grading look that separates foreground from background.
+</ResponseField>
+
+<ResponseField name="PRESETS.SERIOUS_VINTAGE" type="string" default="'serious-vintage'">
+  Strong vintage effect with heavily boosted warm tones and significantly desaturated blues. More intense than the regular vintage preset.
+</ResponseField>
+
+<ResponseField name="PRESETS.LIGHTS_OUT" type="string" default="'lights-out'">
+  Dark, moody atmosphere with blue-tinted shadows. Reduced overall brightness with a cool tone in darker areas.
+</ResponseField>
+
+<ResponseField name="PRESETS.SCI_FI" type="string" default="'sci-fi'">
+  Cool blue-green futuristic look. Reduced reds with boosted greens and blues for a technological, otherworldly feel.
+</ResponseField>
+
+## Functions
+
+### loadPreset()
+
+Loads a preset LUT by name. The preset is cached automatically for subsequent calls.
+
+```typescript
+import { loadPreset, PRESETS } from 'web-luts';
+
+const lut = await loadPreset(PRESETS.VINTAGE);
+console.log(lut.size);  // 17
+console.log(lut.title); // 'vintage'
+```
+
+<ParamField path="name" type="PresetName" required>
+  The preset name to load. Use values from the `PRESETS` constant.
+</ParamField>
+
+**Returns:** `Promise<ParsedLut>` - The loaded LUT data structure
+
+**Features:**
+- Automatically caches loaded presets for performance
+- Falls back to programmatic generation if preset file fails to load
+- Uses identity LUT as ultimate fallback for errors
+
+### isValidPreset()
+
+Checks if a given string is a valid preset name.
+
+```typescript
+import { isValidPreset } from 'web-luts';
+
+console.log(isValidPreset('vintage'));    // true
+console.log(isValidPreset('custom'));     // false
+console.log(isValidPreset('CINEMATIC'));  // false (case-sensitive)
+```
+
+<ParamField path="name" type="string" required>
+  The string to validate as a preset name.
+</ParamField>
+
+**Returns:** `boolean` - Whether the name is a valid preset (also serves as a type guard)
+
+### preloadAllPresets()
+
+Preloads all preset LUTs in the background for instant access later. Useful for improving performance when you know presets will be used.
+
+```typescript
+import { preloadAllPresets } from 'web-luts';
+
+// Preload all presets on app initialization
+preloadAllPresets();
+
+// Later, presets load instantly from cache
+const lut = await loadPreset(PRESETS.CINEMATIC);
+```
+
+**Returns:** `void`
+
+**Note:** Errors during preloading are caught and logged internally. This function does not block or throw errors.
+
+## Complete Example
+
+```typescript
+import { PRESETS, loadPreset, isValidPreset, preloadAllPresets } from 'web-luts';
+
+// Preload all presets on app start
+preloadAllPresets();
+
+// Validate user input
+const userPreset = getUserSelection();
+if (!isValidPreset(userPreset)) {
+  console.error('Invalid preset selected');
+  return;
+}
+
+// Load and apply the preset
+const lut = await loadPreset(userPreset);
+
+// Apply to canvas (see applyLutToCanvas documentation)
+applyLutToCanvas(sourceCanvas, targetCanvas, lut);
+```
+
+## Type Definitions
+
+```typescript
+type PresetName = 
+  | 'normal'
+  | 'vintage'
+  | 'cinematic'
+  | 'serious-vintage'
+  | 'lights-out'
+  | 'sci-fi';
+
+interface ParsedLut {
+  size: number;
+  data: Float32Array;
+  title?: string;
+}
+```

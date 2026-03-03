@@ -1,0 +1,262 @@
+---
+title: Performance Optimization
+description: Tips and best practices for maximizing performance with Web LUTs
+---
+
+## WebGL Acceleration
+
+Web LUTs uses WebGL for hardware-accelerated color grading, making it suitable for real-time applications.
+
+### WebGL 2.0 vs WebGL 1.0
+
+The library automatically selects the best available WebGL version:
+
+- **WebGL 2.0**: Uses native 3D textures for direct LUT lookups (faster, more accurate)
+- **WebGL 1.0**: Flattens 3D LUTs to 2D tiled textures (slower, but widely compatible)
+
+The version is detected at src/core/glEngine.ts:52:
+
+```ts
+this.gl = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl')!;
+this.isWebGL2 = !!(this.gl as WebGL2RenderingContext).texImage3D;
+```
+
+Check which version is being used:
+
+```js
+const canvas = document.createElement('canvas');
+const hasWebGL2 = !!canvas.getContext('webgl2');
+
+console.log('Using WebGL', hasWebGL2 ? '2.0' : '1.0');
+```
+
+## LUT Caching
+
+LUTs are automatically cached after first load to avoid redundant network requests and parsing.
+
+### Preset Caching
+
+Built-in presets are cached in memory after the first load:
+
+```js
+// First load - fetches from network
+await ColorGrader.apply({ target: '#hero', mode: 'vintage' });
+
+// Subsequent loads - instant from cache
+await ColorGrader.apply({ target: '#hero', mode: 'vintage' });
+```
+
+The cache is implemented at src/presets/index.ts:27 using a `Map<PresetName, ParsedLut>`.
+
+### Custom LUT Caching
+
+Custom LUTs loaded via `loadCustomCube()` are also cached:
+
+```js
+// Loads and caches the LUT
+const handle = await ColorGrader.loadCustomCube('/my-lut.cube');
+
+// Uses cached version
+await ColorGrader.setMode(handle);
+await ColorGrader.setMode(handle); // No re-fetch
+```
+
+Custom LUT cache: src/index.ts:23
+
+### WebGL Texture Caching
+
+WebGL textures for LUTs are cached per engine instance:
+
+```js
+// First application - uploads texture to GPU
+await ColorGrader.apply({ target: img1, mode: 'cinematic' });
+
+// Second application - reuses GPU texture
+await ColorGrader.apply({ target: img2, mode: 'cinematic' });
+```
+
+Texture caching logic: src/core/glEngine.ts:208
+
+## Preloading LUTs
+
+Preload all preset LUTs during initialization to eliminate latency when switching modes:
+
+```js
+ColorGrader.init({
+  autoload: true  // Preloads all 6 presets in background
+});
+```
+
+This downloads and parses all .cube files asynchronously without blocking. The preload implementation is at src/presets/index.ts:179:
+
+```ts
+export function preloadAllPresets(): void {
+  Object.values(PRESETS).forEach(preset => {
+    loadPreset(preset as PresetName).catch(() => {
+      // Errors already logged in loadPreset
+    });
+  });
+}
+```
+
+<Warning>
+  Setting `autoload: false` will defer LUT downloads until first use. This reduces initial bandwidth but introduces latency when changing modes.
+</Warning>
+
+## Engine Reuse
+
+The library maintains a cache of `GlEngine` instances per LUT to avoid recreating WebGL contexts:
+
+```js
+// Creates one engine for 'vintage'
+await ColorGrader.apply({ target: img1, mode: 'vintage' });
+
+// Reuses the 'vintage' engine
+await ColorGrader.apply({ target: img2, mode: 'vintage' });
+
+// Creates a separate engine for 'cinematic'
+await ColorGrader.apply({ target: img3, mode: 'cinematic' });
+```
+
+Engine cache implementation: src/core/apply.ts:5
+
+```ts
+const engineCache = new Map<string, GlEngine>();
+```
+
+## Batch Processing
+
+When applying to multiple images, use a selector to process them in a single operation:
+
+```js
+// Efficient - single operation
+await ColorGrader.apply({
+  target: '.gallery img',
+  mode: 'cinematic'
+});
+
+// Less efficient - multiple separate calls
+const images = document.querySelectorAll('.gallery img');
+for (const img of images) {
+  await ColorGrader.apply({ target: img, mode: 'cinematic' });
+}
+```
+
+Batch processing iterates efficiently at src/core/apply.ts:30:
+
+```ts
+if ('length' in target) {
+  for (let i = 0; i < target.length; i++) {
+    const image = target[i] as HTMLImageElement;
+    applyToImage(image, mode, lut, strength);
+  }
+  return target;
+}
+```
+
+## CORS Configuration
+
+For external images, proper CORS headers are essential for WebGL texture access.
+
+<Steps>
+  <Step title="Add crossorigin attribute">
+    Set the `crossorigin` attribute on image elements:
+    
+    ```html
+    <img src="https://example.com/photo.jpg" crossorigin="anonymous">
+    ```
+  </Step>
+  
+  <Step title="Configure server CORS headers">
+    Ensure your image server sends proper CORS headers:
+    
+    ```
+    Access-Control-Allow-Origin: *
+    ```
+    
+    Or restrict to specific origins:
+    
+    ```
+    Access-Control-Allow-Origin: https://yourdomain.com
+    ```
+  </Step>
+</Steps>
+
+The library automatically adds `crossorigin="anonymous"` if missing (src/core/apply.ts:58), but for already-loaded images, it must reload them:
+
+```ts
+if (!image.hasAttribute('crossorigin')) {
+  console.warn('Adding crossorigin attribute to image');
+  image.setAttribute('crossorigin', 'anonymous');
+  if (image.complete) {
+    const originalSrc = image.src;
+    image.src = '';
+    setTimeout(() => {
+      image.src = originalSrc;
+    }, 0);
+    return image;
+  }
+}
+```
+
+<Warning>
+  WebGL cannot access tainted image data. If you see "SecurityError: The operation is insecure" errors, check your CORS configuration. See src/core/apply.ts:118 for error handling.
+</Warning>
+
+## Memory Management
+
+### Disposing Resources
+
+When done with color grading (e.g., navigating away in an SPA), dispose of WebGL resources:
+
+```js
+// Clean up all WebGL contexts and textures
+ColorGrader.dispose();
+```
+
+This prevents memory leaks by:
+- Deleting all WebGL textures (src/core/glEngine.ts:559)
+- Deleting buffer objects
+- Deleting framebuffers
+- Deleting shader programs
+- Clearing texture caches
+- Removing the WebGL canvas
+
+### WeakMap for Original Images
+
+Original image sources are stored in a `WeakMap` to allow garbage collection:
+
+```ts
+const originalImages = new WeakMap<HTMLImageElement, string>();
+```
+
+When an image element is removed from the DOM and no longer referenced, its original source data is automatically garbage collected.
+
+## Performance Checklist
+
+- ✅ Use `autoload: true` to preload LUTs
+- ✅ Add `crossorigin="anonymous"` to image elements
+- ✅ Batch process multiple images with selectors
+- ✅ Reuse modes instead of constantly switching
+- ✅ Call `dispose()` when cleaning up
+- ✅ Use WebGL 2.0 browsers when possible
+- ✅ Stick to 17x17x17 or 33x33x33 LUT sizes for web
+
+## Benchmarking
+
+Monitor performance in production:
+
+```js
+console.time('lut-apply');
+await ColorGrader.apply({
+  target: '.gallery img',
+  mode: 'cinematic'
+});
+console.timeEnd('lut-apply');
+```
+
+Typical performance (on modern hardware):
+- **Initial LUT load**: 50-200ms (network + parsing)
+- **Cached LUT application**: 5-15ms per image
+- **WebGL 2.0 rendering**: 1-3ms per image
+- **WebGL 1.0 rendering**: 3-8ms per image

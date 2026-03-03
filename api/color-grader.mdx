@@ -1,0 +1,144 @@
+---
+title: ColorGrader
+description: Main class for applying LUT color grading to images
+---
+
+## Overview
+
+The `ColorGrader` class is the primary interface for applying LUT (Look-Up Table) color grading to web images. It provides a static API for initializing automatic color grading, applying effects to specific images, and managing color grading state.
+
+## Features
+
+- Apply professional color grading to any `<img>` element
+- Supports WebGL 2.0 for high-performance 3D LUTs with fallback to WebGL 1.0
+- Built-in presets: `normal`, `vintage`, `cinematic`, `serious-vintage`, `lights-out`, `sci-fi`
+- Load custom .cube LUT files
+- Control grading strength/intensity (0-1)
+- Automatic processing of dynamically added images via MutationObserver
+- SSR-safe (no-op on server)
+
+## Import
+
+```typescript
+import { ColorGrader } from 'web-luts';
+```
+
+## Methods
+
+<CardGroup cols={2}>
+  <Card title="init" icon="play" href="/api/init">
+    Initialize automatic color grading for all images
+  </Card>
+  <Card title="apply" icon="wand-magic-sparkles" href="/api/apply">
+    Apply color grading to specific target images
+  </Card>
+  <Card title="setStrength" icon="sliders" href="/api/set-strength">
+    Update the blending strength of color grading
+  </Card>
+  <Card title="setMode" icon="palette" href="/api/set-mode">
+    Change the active LUT preset or custom mode
+  </Card>
+  <Card title="loadCustomCube" icon="upload" href="/api/load-custom-cube">
+    Load a custom .cube LUT file
+  </Card>
+  <Card title="reset" icon="rotate-left" href="/api/reset">
+    Reset images to their original state
+  </Card>
+  <Card title="dispose" icon="trash" href="/api/dispose">
+    Clean up resources and reset all state
+  </Card>
+</CardGroup>
+
+## Basic Usage
+
+### Automatic Initialization
+
+Apply color grading to all images at load time:
+
+```javascript
+import { ColorGrader } from 'web-luts';
+
+ColorGrader.init({ 
+  mode: 'cinematic',
+  strength: 0.8
+});
+```
+
+### Selective Application
+
+Apply to specific images:
+
+```javascript
+const heroImage = document.getElementById('hero');
+ColorGrader.apply({ 
+  target: heroImage, 
+  mode: 'vintage' 
+});
+```
+
+### Dynamic Controls
+
+```javascript
+// Strength slider
+document.querySelector('#strength-slider').addEventListener('input', (e) => {
+  ColorGrader.setStrength(parseFloat(e.target.value));
+});
+
+// Mode switcher
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    ColorGrader.setMode(e.target.value);
+  });
+});
+```
+
+## Built-in Presets
+
+<ParamField path="normal" type="string">
+  No color grading (identity LUT)
+</ParamField>
+
+<ParamField path="vintage" type="string">
+  Warm, faded film look with reduced saturation
+</ParamField>
+
+<ParamField path="cinematic" type="string">
+  Hollywood-style teal and orange color grading
+</ParamField>
+
+<ParamField path="serious-vintage" type="string">
+  Stronger vintage effect with more contrast
+</ParamField>
+
+<ParamField path="lights-out" type="string">
+  Dark, moody look with blue shadows
+</ParamField>
+
+<ParamField path="sci-fi" type="string">
+  Cool blue-green tint for futuristic aesthetics
+</ParamField>
+
+## TypeScript Types
+
+```typescript
+export interface InitOptions {
+  mode?: string;
+  strength?: number;
+  selector?: string;
+  autoload?: boolean;
+}
+
+export interface ApplyOptions {
+  target: HTMLImageElement | NodeListOf<HTMLImageElement> | string;
+  mode?: string;
+  lut?: ParsedLut;
+  strength?: number;
+  scope?: string;
+}
+```
+
+## See Also
+
+- [init()](/api/init) - Initialize automatic color grading
+- [apply()](/api/apply) - Apply to specific images
+- [Custom LUTs](/api/load-custom-cube) - Load your own .cube files

@@ -1,0 +1,251 @@
+---
+title: ColorGrader.setMode()
+description: Change the active LUT mode for color grading
+---
+
+## Signature
+
+```typescript
+ColorGrader.setMode(mode: string, target?: HTMLImageElement | NodeListOf<HTMLImageElement> | string): Promise<void>
+```
+
+## Description
+
+Changes the active LUT (Look-Up Table) mode for color grading. The mode can be:
+- A built-in preset name (`vintage`, `cinematic`, etc.)
+- A custom LUT handle returned from `loadCustomCube()`
+
+When called without a `target`, this updates the default mode and reapplies to all previously processed images.
+
+## Parameters
+
+<ParamField path="mode" type="string" required>
+  The preset name or custom LUT handle to use. Built-in presets:
+  - `normal` - No color grading (identity LUT)
+  - `vintage` - Warm, faded film look
+  - `cinematic` - Hollywood-style teal and orange
+  - `serious-vintage` - Stronger vintage with more contrast
+  - `lights-out` - Dark, moody look with blue shadows
+  - `sci-fi` - Cool blue-green tint
+  
+  Or use a handle returned from `loadCustomCube()` for custom LUTs
+</ParamField>
+
+<ParamField path="target" type="HTMLImageElement | NodeListOf<HTMLImageElement> | string" optional>
+  Optional target to apply the mode change to. Can be:
+  - A single `HTMLImageElement`
+  - A `NodeListOf<HTMLImageElement>` (e.g., from `querySelectorAll`)
+  - A CSS selector string
+  
+  If omitted, updates the default mode and reapplies to all images matching the selector set in `init()`
+</ParamField>
+
+## Return Value
+
+<ResponseField name="result" type="Promise<void>">
+  A Promise that resolves when the mode has been applied
+</ResponseField>
+
+## Examples
+
+### Update Global Mode
+
+Change the mode for all initialized images:
+
+```javascript
+ColorGrader.init({ mode: 'normal' });
+
+// Later, switch to cinematic
+await ColorGrader.setMode('cinematic');
+```
+
+### Mode Selector UI
+
+```javascript
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    ColorGrader.setMode(e.target.value);
+  });
+});
+```
+
+```html
+<label><input type="radio" name="mode" value="normal"> Normal</label>
+<label><input type="radio" name="mode" value="vintage"> Vintage</label>
+<label><input type="radio" name="mode" value="cinematic" checked> Cinematic</label>
+<label><input type="radio" name="mode" value="sci-fi"> Sci-Fi</label>
+```
+
+### Apply Mode to Specific Image
+
+```javascript
+const heroImage = document.getElementById('hero');
+await ColorGrader.setMode('lights-out', heroImage);
+```
+
+### Apply Mode Using Selector
+
+```javascript
+// Apply vintage look to all gallery images
+await ColorGrader.setMode('vintage', '.gallery-image');
+```
+
+### Use Custom LUT Mode
+
+```javascript
+// Load custom LUT
+const customHandle = await ColorGrader.loadCustomCube('/my-lut.cube');
+
+// Apply the custom LUT
+await ColorGrader.setMode(customHandle);
+```
+
+### Dropdown Menu
+
+```javascript
+const modeSelect = document.querySelector('#mode-select');
+
+modeSelect.addEventListener('change', (e) => {
+  ColorGrader.setMode(e.target.value);
+});
+```
+
+```html
+<select id="mode-select">
+  <option value="normal">Normal</option>
+  <option value="vintage">Vintage</option>
+  <option value="cinematic" selected>Cinematic</option>
+  <option value="serious-vintage">Serious Vintage</option>
+  <option value="lights-out">Lights Out</option>
+  <option value="sci-fi">Sci-Fi</option>
+</select>
+```
+
+## Behavior
+
+### Default Mode Update
+
+When called without a `target`:
+1. Updates the internal default mode value
+2. Reapplies color grading to all images matching the selector from `init()`
+3. This becomes the new default for future `apply()` calls
+
+### Targeted Mode Update
+
+When called with a `target`:
+1. Applies the new mode only to the specified target(s)
+2. Does not change the default mode for other images
+3. Uses the current default strength for the color grading
+
+### Preset Loading
+
+If the mode hasn't been loaded yet:
+- The LUT file is fetched from the network
+- The method waits for loading to complete
+- Subsequent calls to the same mode use the cached LUT
+
+### Invalid Mode Handling
+
+If an invalid mode name is provided:
+- A warning is logged to the console
+- The system falls back to the `normal` preset
+- Processing continues without error
+
+## Use Cases
+
+### Theme-Based Color Grading
+
+```javascript
+const theme = document.documentElement.getAttribute('data-theme');
+
+if (theme === 'dark') {
+  await ColorGrader.setMode('lights-out');
+} else if (theme === 'retro') {
+  await ColorGrader.setMode('vintage');
+} else {
+  await ColorGrader.setMode('normal');
+}
+```
+
+### Different Modes for Different Sections
+
+```javascript
+// Hero section: dramatic cinematic look
+await ColorGrader.setMode('cinematic', '#hero img');
+
+// Gallery section: subtle vintage
+await ColorGrader.setMode('vintage', '.gallery img');
+
+// Product photos: no grading
+await ColorGrader.setMode('normal', '.product-image');
+```
+
+### Time-Based Mode Switching
+
+```javascript
+const hour = new Date().getHours();
+
+if (hour < 6 || hour > 20) {
+  // Night time: moody dark look
+  await ColorGrader.setMode('lights-out');
+} else {
+  // Day time: bright cinematic look
+  await ColorGrader.setMode('cinematic');
+}
+```
+
+### Cycle Through Modes
+
+```javascript
+const modes = ['normal', 'vintage', 'cinematic', 'sci-fi'];
+let currentIndex = 0;
+
+document.querySelector('#next-mode-btn').addEventListener('click', async () => {
+  currentIndex = (currentIndex + 1) % modes.length;
+  await ColorGrader.setMode(modes[currentIndex]);
+});
+```
+
+## Built-in Presets
+
+<CardGroup cols={2}>
+  <Card title="normal">
+    No color grading (identity LUT)
+  </Card>
+  <Card title="vintage">
+    Warm, faded film look with reduced saturation
+  </Card>
+  <Card title="cinematic">
+    Hollywood-style teal shadows and orange highlights
+  </Card>
+  <Card title="serious-vintage">
+    Stronger vintage effect with more contrast and warmth
+  </Card>
+  <Card title="lights-out">
+    Dark, moody look with blue tinted shadows
+  </Card>
+  <Card title="sci-fi">
+    Cool blue-green tint for futuristic aesthetics
+  </Card>
+</CardGroup>
+
+## Performance Notes
+
+<Note>
+  Preset LUTs are cached after first load. Switching between previously used modes is nearly instantaneous.
+</Note>
+
+<Tip>
+  Enable `autoload: true` in `init()` to preload all presets during initialization for seamless mode switching.
+</Tip>
+
+## SSR Safety
+
+This method is SSR-safe and will silently no-op when called in a server environment.
+
+## See Also
+
+- [loadCustomCube()](/api/load-custom-cube) - Load custom .cube LUT files
+- [setStrength()](/api/set-strength) - Adjust the blend strength
+- [apply()](/api/apply) - Apply color grading with specific options
+- [init()](/api/init) - Set initial default mode

@@ -1,0 +1,103 @@
+---
+title: Chrome Extension Overview
+description: Learn how the Film Grade Chrome extension applies cinematic color grading to website images using LUT technology and optional film effects.
+---
+
+## What is Film Grade?
+
+Film Grade is a Chrome extension that transforms images on websites by applying professional film-inspired color grading. Using Look-Up Table (LUT) technology, it simulates the aesthetic of classic film stocks like Fuji and Kodak, bringing a cinematic look to any webpage.
+
+## Key Features
+
+### Film Emulation Presets
+
+Apply authentic film looks to images using CUBE LUT format:
+- **Fuji Film**: Warm tones with slightly reduced saturation
+- **Kodak Film**: Enhanced saturation with a vintage feel
+- **None**: Disable color grading
+- **Greyscale**: Debug preset for testing
+
+### Optional Effects
+
+<CardGroup cols={2}>
+  <Card title="Film Grain" icon="grain">
+    Add authentic analog film grain to processed images for a true film photography aesthetic.
+  </Card>
+  <Card title="Vignette" icon="circle">
+    Apply subtle edge darkening that draws focus to the center of images, mimicking natural lens vignetting.
+  </Card>
+</CardGroup>
+
+### Smart Image Detection
+
+The extension intelligently identifies and processes:
+- Standard `<img>` elements
+- Images within `<picture>` elements for responsive images
+- CSS background images on div, section, article, and figure elements
+- Dynamically loaded images (with MutationObserver)
+
+### Safety Features
+
+- **SVG Protection**: Automatically skips vector graphics and SVG images
+- **Size Filtering**: Ignores tiny images (< 30px) to avoid processing icons
+- **Memory Management**: Limits canvas size to prevent browser crashes
+- **CORS Handling**: Uses background script proxy for cross-origin images
+
+## How It Works
+
+<Steps>
+  <Step title="Image Detection">
+    The content script scans the page for img elements and CSS background images, filtering out SVGs and images that are too small or outside the viewport.
+  </Step>
+  
+  <Step title="Canvas Processing">
+    Each detected image is loaded onto an HTML5 canvas element with proper cross-origin handling to avoid tainting.
+  </Step>
+  
+  <Step title="LUT Application">
+    The selected CUBE LUT file is loaded and parsed. Each pixel's RGB values are transformed through the 3D lookup table to apply color grading.
+  </Step>
+  
+  <Step title="Effects Layer">
+    Optional film grain (random noise) and vignette (radial gradient overlay) effects are applied to the canvas using 2D context operations.
+  </Step>
+  
+  <Step title="Image Replacement">
+    The processed canvas is converted to a data URL and replaces the original image source, preserving the original URL for potential reversal.
+  </Step>
+</Steps>
+
+## Architecture
+
+### Extension Components
+
+The extension follows the standard Chrome extension architecture:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| **Popup UI** | `popup.tsx` | React-based interface for selecting presets and toggling effects |
+| **Content Script** | `content.ts`, `contents/index.ts` | Injected into web pages to process images |
+| **Image Processor** | `contents/imageProcessor.ts` | Core LUT application and canvas manipulation logic |
+| **Background Script** | `background.ts` | Manages settings storage and CORS proxy for images |
+| **Early Init** | `contents/imageProcessor.document_start.ts` | Preloads LUTs and sets up early observers |
+
+### Technology Stack
+
+Built with modern web technologies:
+- **Plasmo Framework**: Chrome extension development framework
+- **React 18**: UI components for popup interface
+- **TypeScript**: Type-safe code throughout
+- **Chrome Storage API**: Synced settings across devices
+- **Canvas API**: Image manipulation and processing
+- **MutationObserver**: Detecting dynamically added images
+
+## Performance Optimizations
+
+The extension includes numerous optimizations for smooth performance:
+
+- **Batch Processing**: Processes images in configurable batches (default: 6 at a time)
+- **Viewport Prioritization**: Visible images are processed first
+- **LUT Caching**: Parsed LUT data is cached in memory
+- **Size Limits**: Images larger than 3840px are downscaled
+- **Request Idle Callback**: Uses browser idle time for deferred processing
+- **Processing Timeout**: Prevents stuck operations with 2.5s timeout

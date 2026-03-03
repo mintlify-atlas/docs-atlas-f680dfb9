@@ -1,0 +1,388 @@
+---
+title: Development Guide
+description: Learn how to set up the development environment, build the extension, and implement custom features.
+---
+
+## Development Setup
+
+Get started developing the Film Grade Chrome extension locally.
+
+### Prerequisites
+
+Ensure you have the following installed:
+- **Node.js** 18.x or later
+- **pnpm** (recommended) or npm
+- **Chrome** browser for testing
+- **Git** for version control
+
+### Initial Setup
+
+<Steps>
+  <Step title="Clone the Repository">
+    Navigate to the extension source directory:
+    
+    ```bash
+    cd ~/workspace/source/Color-grader-chrome/film-grade-website
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Install all required packages:
+    
+    <CodeGroup>
+    ```bash pnpm
+    pnpm install
+    ```
+    
+    ```bash npm
+    npm install
+    ```
+    </CodeGroup>
+    
+    This installs:
+    - **Plasmo** (0.90.3): Extension framework
+    - **React** (18.2.0): UI library
+    - **TypeScript** (5.3.3): Type safety
+    - **@plasmohq/storage**: Persistent storage utilities
+  </Step>
+  
+  <Step title="Start Development Server">
+    Run the dev server with hot reload:
+    
+    <CodeGroup>
+    ```bash pnpm
+    pnpm dev
+    ```
+    
+    ```bash npm
+    npm run dev
+    ```
+    </CodeGroup>
+    
+    This creates a live-reloading build in `build/chrome-mv3-dev/`.
+  </Step>
+  
+  <Step title="Load in Chrome">
+    1. Open `chrome://extensions`
+    2. Enable "Developer mode"
+    3. Click "Load unpacked"
+    4. Select the `build/chrome-mv3-dev` directory
+  </Step>
+</Steps>
+
+## Project Structure
+
+Understanding the codebase organization:
+
+```
+film-grade-website/
+├── popup.tsx                 # Main popup UI component
+├── content.ts                # Content script entry point
+├── background.ts             # Background service worker
+├── contents/
+│   ├── index.ts              # Content script initialization
+│   ├── imageProcessor.ts     # Core image processing logic
+│   └── imageProcessor.document_start.ts  # Early initialization
+├── assets/
+│   ├── icon.png              # Extension icon
+│   └── luts/                 # LUT files (*.cube format)
+│       ├── fuji.cube
+│       ├── kodak.cube
+│       └── greyscale.cube
+├── package.json              # Dependencies and scripts
+└── README.md                 # Project documentation
+```
+
+### Key Files
+
+<AccordionGroup>
+  <Accordion title="popup.tsx">
+    React component that renders the extension's popup interface.
+    
+    **Responsibilities**:
+    - Preset selection UI
+    - Effect toggles (grain, vignette)
+    - Settings storage via Chrome Storage API
+    - Test image preview
+    - Debug tools
+    
+    **Location**: `popup.tsx:1-555`
+  </Accordion>
+  
+  <Accordion title="content.ts">
+    Entry point for the content script injected into web pages.
+    
+    **Responsibilities**:
+    - Imports main content script functionality
+    - Imports early-start image processor
+    - Sets marker flag (`data-film-grade-loaded`)
+    - Notifies background script of successful load
+    
+    **Location**: `content.ts:1-26`
+  </Accordion>
+  
+  <Accordion title="contents/index.ts">
+    Main content script initialization and settings management.
+    
+    **Responsibilities**:
+    - Retrieves filter settings from storage
+    - Initializes image processor
+    - Listens for storage changes
+    - Handles messages from popup (ping, refresh)
+    
+    **Location**: `contents/index.ts:1-96`
+  </Accordion>
+  
+  <Accordion title="contents/imageProcessor.ts">
+    Core image processing engine with LUT application logic.
+    
+    **Key Functions**:
+    - `findMediaElements()`: Detects images and backgrounds
+    - `processImage()`: Applies LUT and effects to img elements
+    - `processBackgroundImage()`: Handles CSS backgrounds
+    - `parseCubeLUT()`: Parses CUBE format LUT files
+    - `applyCubeLUT()`: Transforms pixels through 3D LUT
+    - `applyGrain()` / `applyVignette()`: Additional effects
+    
+    **Location**: `contents/imageProcessor.ts:1-1359+`
+  </Accordion>
+  
+  <Accordion title="background.ts">
+    Background service worker for extension-wide operations.
+    
+    **Responsibilities**:
+    - Initializes default settings on install
+    - Tracks tabs with content script loaded
+    - Proxies images to bypass CORS restrictions
+    - Manages context menu items
+    - Handles enable/disable/refresh commands
+    
+    **Location**: `background.ts:1-244`
+  </Accordion>
+</AccordionGroup>
+
+## Building for Production
+
+Create an optimized production build:
+
+<Steps>
+  <Step title="Run Build Command">
+    <CodeGroup>
+    ```bash pnpm
+    pnpm build
+    ```
+    
+    ```bash npm
+    npm run build
+    ```
+    </CodeGroup>
+    
+    This generates a minified, production-ready bundle in `build/chrome-mv3-prod/`.
+  </Step>
+  
+  <Step title="Test Production Build">
+    Load the production build in Chrome to test:
+    
+    1. Remove the development version if loaded
+    2. Click "Load unpacked" in `chrome://extensions`
+    3. Select `build/chrome-mv3-prod`
+    4. Test on various websites
+  </Step>
+  
+  <Step title="Package for Distribution">
+    Create a ZIP file for Chrome Web Store submission:
+    
+    <CodeGroup>
+    ```bash pnpm
+    pnpm package
+    ```
+    
+    ```bash npm
+    npm run package
+    ```
+    </CodeGroup>
+    
+    This creates a `.zip` file in `build/chrome-mv3-prod.zip`.
+  </Step>
+</Steps>
+
+## Adding New Presets
+
+Extend the extension with custom film looks:
+
+<Steps>
+  <Step title="Create or Obtain LUT File">
+    LUT files must be in CUBE format. You can:
+    - Create LUTs using software like DaVinci Resolve
+    - Convert from other formats (3DL, CUBE, ICC profiles)
+    - Download free film emulation LUTs online
+    
+    CUBE format example:
+    ```cube
+    # Film Look LUT
+    LUT_3D_SIZE 33
+    
+    0.000000 0.000000 0.000000
+    0.031373 0.027451 0.023529
+    0.062745 0.054902 0.047059
+    ...
+    ```
+  </Step>
+  
+  <Step title="Add LUT to Assets">
+    Place your `.cube` file in the `assets/luts/` directory:
+    
+    ```bash
+    cp custom-film.cube assets/luts/
+    ```
+  </Step>
+  
+  <Step title="Update Preset List">
+    Edit `popup.tsx` to add your preset to the `presets` array:
+    
+    ```tsx popup.tsx
+    const presets = [
+      { id: "none", name: "None" },
+      { id: "fuji", name: "Fuji Film" },
+      { id: "kodak", name: "Kodak Film" },
+      { id: "custom-film", name: "Custom Film" }, // Add this
+      { id: "greyscale", name: "Greyscale (Debug)" }
+    ]
+    ```
+    
+    The `id` must match the LUT filename without the `.cube` extension.
+  </Step>
+  
+  <Step title="Test Your Preset">
+    Reload the extension and test the new preset on various images to ensure proper color transformation.
+  </Step>
+</Steps>
+
+## Testing
+
+Comprehensive testing strategies for the extension:
+
+### Manual Testing
+
+Test on a variety of websites:
+
+| Website Type | Test Focus |
+|--------------|------------|
+| **Image galleries** | Batch processing, performance |
+| **E-commerce sites** | Product images, thumbnails |
+| **News sites** | Hero images, inline photos |
+| **Social media** | Dynamic loading, infinite scroll |
+| **Portfolios** | Large high-res images |
+
+### Browser Console Debugging
+
+Enable debug mode for verbose logging:
+
+1. Open `contents/imageProcessor.ts:2`
+2. Set `DEBUG_MODE = true`
+3. Rebuild the extension
+4. Open DevTools Console (`F12`)
+5. Filter logs by "Film Grade"
+
+### Common Debug Scenarios
+
+<CodeGroup>
+```javascript Check if content script loaded
+// In browser console
+document.documentElement.dataset.filmGradeLoaded
+// Should return: "true"
+```
+
+```javascript Manually trigger processing
+// In browser console
+if (window.FilmGradeExt) {
+  const elements = window.FilmGradeExt.findAllMediaElements();
+  console.log(`Found ${elements.length} media elements`);
+}
+```
+
+```javascript Inspect LUT data
+// In browser console
+console.log(window.FilmGradeExt.preloadedLUT);
+// Shows preloaded LUT text
+```
+</CodeGroup>
+
+## Configuration Options
+
+Adjust processing behavior by modifying the `CONFIG` object in `contents/imageProcessor.ts:193-226`:
+
+```typescript contents/imageProcessor.ts
+const CONFIG = {
+  MAX_IMAGES_TO_PROCESS: 150,    // Max images per page
+  MIN_IMAGE_SIZE: 30,             // Skip images smaller than this
+  LARGE_IMAGE_SIZE: 200,          // Classify as "large" for deferred processing
+  MAX_CANVAS_DIMENSION: 3840,     // Downscale larger images
+  BATCH_SIZE: 6,                  // Images processed simultaneously
+  BATCH_DELAY: 150,               // ms delay between batches
+  VIEWPORT_EXPANSION: 4000,       // px beyond viewport to consider
+  PROCESSING_TIMEOUT: 2500,       // ms before canceling stuck process
+  MAX_CACHE_SIZE: 300,            // Maximum cached processed URLs
+};
+```
+
+<Note>
+Increasing `BATCH_SIZE` improves speed but may cause UI lag. Adjust based on target hardware.
+</Note>
+
+## Publishing
+
+Submit your extension to the Chrome Web Store:
+
+<Steps>
+  <Step title="Prepare Assets">
+    Gather required promotional materials:
+    - 128x128 icon (required)
+    - 1280x800 screenshot (at least 1)
+    - 440x280 small tile image (required)
+    - Detailed description (132 characters minimum)
+  </Step>
+  
+  <Step title="Create Developer Account">
+    Register at the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard) (one-time $5 fee).
+  </Step>
+  
+  <Step title="Upload Extension">
+    1. Click "New Item"
+    2. Upload the `chrome-mv3-prod.zip` file
+    3. Fill in store listing details
+    4. Add screenshots and promotional images
+    5. Select appropriate categories
+  </Step>
+  
+  <Step title="Submit for Review">
+    Click "Submit for review". Review typically takes a few days.
+    
+    <Tip>
+    Consider using the [built-in BPP GitHub action](https://docs.plasmo.com/framework/workflows/submit) for automated submissions.
+    </Tip>
+  </Step>
+</Steps>
+
+## Automated Deployment
+
+Use Plasmo's built-in deployment workflow:
+
+```yaml .github/workflows/submit.yml
+name: Submit to Chrome Web Store
+on:
+  release:
+    types: [created]
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: PlasmoHQ/bpp@v3
+        with:
+          artifact: build/chrome-mv3-prod.zip
+          keys: ${{ secrets.BPP_KEYS }}
+```
+
+See the [Plasmo submission guide](https://docs.plasmo.com/framework/workflows/submit) for full setup instructions.

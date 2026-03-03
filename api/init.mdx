@@ -1,0 +1,134 @@
+---
+title: ColorGrader.init()
+description: Initialize the ColorGrader to apply color grading to all images at load time
+---
+
+## Signature
+
+```typescript
+ColorGrader.init(options?: InitOptions): void
+```
+
+## Description
+
+Initializes the ColorGrader library to automatically apply color grading to all images matching the specified selector. This method:
+
+1. Sets default color grading parameters (mode and strength)
+2. Preloads LUT files in the background (if `autoload` is true)
+3. Processes all existing images matching the selector
+4. Sets up a MutationObserver to automatically process dynamically added images
+
+This is typically the first method you call when using web-luts.
+
+## Parameters
+
+<ParamField path="options" type="InitOptions" default="{}">
+  Configuration options for initialization
+
+  <Expandable title="InitOptions properties">
+    <ParamField path="mode" type="string" default="'normal'">
+      The preset name or custom LUT handle to apply by default. Built-in presets: `normal`, `vintage`, `cinematic`, `serious-vintage`, `lights-out`, `sci-fi`
+    </ParamField>
+
+    <ParamField path="strength" type="number" default="1.0">
+      Default blend strength for color grading. Range: 0-1 where 0 is no effect and 1 is full strength
+    </ParamField>
+
+    <ParamField path="selector" type="string" default="'img'">
+      CSS selector for images to automatically process. Examples: `img`, `.hero-image`, `#main-photo`
+    </ParamField>
+
+    <ParamField path="autoload" type="boolean" default="true">
+      Whether to preload all preset LUTs in the background. Set to `false` to lazy-load LUTs only when needed
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="void" type="void">
+  This method does not return a value
+</ResponseField>
+
+## Examples
+
+### Basic Initialization
+
+Apply cinematic color grading to all images:
+
+```javascript
+import { ColorGrader } from 'web-luts';
+
+ColorGrader.init({ 
+  mode: 'cinematic',
+  strength: 0.8
+});
+```
+
+### Custom Selector
+
+Only apply to images with a specific class:
+
+```javascript
+ColorGrader.init({ 
+  mode: 'vintage',
+  selector: '.gallery-image',
+  strength: 0.6
+});
+```
+
+### Disable Preloading
+
+Lazy-load LUTs to reduce initial bundle processing:
+
+```javascript
+ColorGrader.init({ 
+  mode: 'normal',
+  autoload: false
+});
+```
+
+### Minimal Initialization
+
+Use all defaults (normal mode, full strength, all images):
+
+```javascript
+ColorGrader.init();
+```
+
+## Behavior
+
+### Automatic Image Processing
+
+Once initialized, `ColorGrader` automatically processes:
+- All existing images matching the selector at initialization time
+- Any images dynamically added to the DOM later via a MutationObserver
+
+### SSR Safety
+
+This method is SSR-safe and will silently no-op when called in a server environment (when `window` is undefined).
+
+### Mutation Observer
+
+The method sets up a MutationObserver that watches for:
+- Direct image element additions matching the selector
+- Container elements that contain images matching the selector
+
+This ensures dynamically loaded images are automatically color graded.
+
+## Notes
+
+<Note>
+  Call `init()` only once during your application lifecycle. Calling it multiple times will create multiple MutationObservers.
+</Note>
+
+<Warning>
+  For external images (different domain), ensure your images have the `crossorigin="anonymous"` attribute set to avoid CORS issues with WebGL texture access.
+</Warning>
+
+## See Also
+
+- [apply()](/api/apply) - Apply color grading to specific images
+- [setMode()](/api/set-mode) - Change the active color grading preset
+- [setStrength()](/api/set-strength) - Adjust the blend strength
+- [dispose()](/api/dispose) - Clean up and reset all state

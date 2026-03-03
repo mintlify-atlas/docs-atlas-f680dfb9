@@ -1,0 +1,229 @@
+---
+title: "Look-Up Tables (LUTs)"
+description: "Understanding LUTs, how they enable color grading transformations, and the CUBE file format used in Web LUTs"
+---
+
+## What is a LUT?
+
+A **Look-Up Table (LUT)** is a mathematical tool that transforms one color into another. Instead of applying complex color calculations to every pixel, a LUT provides a pre-computed mapping from input colors to output colors.
+
+Think of it like a color dictionary:
+- Input: RGB(255, 128, 64)
+- Output: RGB(240, 120, 80)
+
+This simple concept enables professional color grading effects used in cinema, photography, and video production to be applied instantly to web images.
+
+## 3D LUTs vs 1D LUTs
+
+Web LUTs uses **3D LUTs**, which map colors in three-dimensional space:
+
+- **1D LUTs**: Transform each color channel independently (not supported)
+- **3D LUTs**: Transform colors based on the combination of all three RGB channels
+
+3D LUTs are more powerful because they can create complex color relationships that 1D LUTs cannot, such as:
+- Shifting only the blues in shadow areas to teal
+- Adding warmth to highlights while cooling shadows
+- Creating selective color effects
+
+<Info>
+  Web LUTs only supports 3D LUTs. If you attempt to parse a 1D LUT from a CUBE file, the library will throw an error:
+  ```
+  Error: 1D LUTs are not supported
+  ```
+</Info>
+
+## How 3D LUTs Work
+
+A 3D LUT is structured as a cube of color values. The most common size is **17×17×17** (4,913 color points), which provides a good balance between accuracy and file size.
+
+### Color Lookup Process
+
+1. **Input Color**: An image pixel with RGB values (e.g., `rgb(127, 89, 200)`)
+2. **Normalization**: Values are normalized to 0-1 range: `(0.498, 0.349, 0.784)`
+3. **LUT Index**: These normalized values map to coordinates in the LUT cube
+4. **Interpolation**: The LUT performs trilinear interpolation between neighboring points
+5. **Output Color**: The transformed RGB value is returned
+
+```typescript
+// Example from lutLoader.ts:114-120
+for (let z = 0; z < size; z++) {
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      data.push([
+        x / (size - 1),  // Red channel
+        y / (size - 1),  // Green channel
+        z / (size - 1)   // Blue channel
+      ]);
+    }
+  }
+}
+```
+
+### LUT Size
+
+The "size" of a LUT refers to the number of divisions along each axis:
+
+| Size | Total Points | Use Case |
+|------|-------------|----------|
+| 17 | 4,913 | Standard (most common) |
+| 33 | 35,937 | High precision |
+| 65 | 274,625 | Professional grade |
+
+Web LUTs automatically detects the size from the CUBE file's `LUT_3D_SIZE` declaration.
+
+## The CUBE File Format
+
+CUBE is an industry-standard text format for storing LUT data. Here's what a typical CUBE file looks like:
+
+```cube
+# Created by Adobe Premiere Pro
+TITLE "Cinematic Look"
+
+LUT_3D_SIZE 17
+
+# LUT data follows (RGB triplets)
+0.0000 0.0000 0.0000
+0.0625 0.0000 0.0000
+0.1250 0.0000 0.0000
+...
+1.0000 1.0000 1.0000
+```
+
+### CUBE File Structure
+
+#### Header Metadata
+
+```cube
+TITLE "My Custom LUT"
+LUT_3D_SIZE 17
+```
+
+- **TITLE**: Optional human-readable name for the LUT
+- **LUT_3D_SIZE**: Required - defines the cube dimensions (17 = 17×17×17)
+- **Comments**: Lines starting with `#` are ignored
+
+#### Data Points
+
+After the header, each line contains three float values representing the output RGB color:
+
+```cube
+0.0000 0.0000 0.0000  # Black → transformed black
+0.0625 0.0000 0.0000  # Dark red → transformed dark red
+...
+```
+
+Values typically range from 0.0 to 1.0, though some LUTs may exceed this range for HDR effects.
+
+### Parsing CUBE Files
+
+The library's parser (`parseCubeFile` in `lutLoader.ts:15-79`) handles:
+
+1. **Comment Filtering**: Removes lines starting with `#`
+2. **Metadata Extraction**: Parses `TITLE` and `LUT_3D_SIZE`
+3. **Data Validation**: Ensures the correct number of points (size³)
+4. **Error Recovery**: Falls back to identity LUT if data is incomplete
+
+```typescript
+// From lutLoader.ts:63-71
+if (size === 0) {
+  throw new Error('Invalid .cube file: LUT size not specified');
+}
+
+if (dataPoints.length !== size * size * size) {
+  console.warn(`Expected ${size * size * size} values, got ${dataPoints.length}`);
+  return createIdentityLut(size, title);
+}
+```
+
+<Note>
+  If a CUBE file is malformed or incomplete, Web LUTs automatically generates an identity LUT (a pass-through that doesn't modify colors) to prevent errors.
+</Note>
+
+## Creating Custom LUTs
+
+You can create LUTs using professional color grading software:
+
+- **Adobe Premiere Pro**: Export → LUT → Export as .cube
+- **DaVinci Resolve**: File → Export LUT
+- **Photoshop**: File → Export → Color Lookup Tables
+- **Online Tools**: Many web-based LUT generators are available
+
+### Identity LUT
+
+An identity LUT is a "no-op" transformation where input colors equal output colors. This is useful for testing or as a baseline:
+
+```typescript
+// From lutLoader.ts:109-127
+export function createIdentityLut(size = 17, title = "Identity"): ParsedLut {
+  const data: number[][] = [];
+
+  for (let z = 0; z < size; z++) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        data.push([
+          x / (size - 1),
+          y / (size - 1),
+          z / (size - 1)
+        ]);
+      }
+    }
+  }
+
+  return { size, data, title };
+}
+```
+
+## Loading LUTs
+
+Web LUTs provides multiple ways to load LUT data:
+
+### From URL
+
+```typescript
+import { loadCubeFromUrl } from 'web-luts/core';
+
+const lut = await loadCubeFromUrl('/luts/my-custom-look.cube');
+```
+
+### From Text Content
+
+```typescript
+import { parseCubeFile } from 'web-luts/core';
+
+const cubeText = await fetch('/luts/vintage.cube').then(r => r.text());
+const lut = parseCubeFile(cubeText);
+```
+
+### Using Built-in Presets
+
+```typescript
+import { loadPreset } from 'web-luts/presets';
+
+const cinematicLut = await loadPreset('cinematic');
+```
+
+## The ParsedLut Interface
+
+Once parsed, LUTs conform to this TypeScript interface:
+
+```typescript
+// From lutLoader.ts:4-8
+export interface ParsedLut {
+  size: number;              // Cube dimensions (e.g., 17)
+  title?: string;            // Optional name from CUBE file
+  data: Float32Array | number[][];  // RGB values
+}
+```
+
+The `data` property contains all color transformation points in a flat array or 2D array format, ready for upload to WebGL textures.
+
+## Performance Considerations
+
+- **File Size**: A 17×17×17 LUT is ~50KB as text, minifies to ~10KB
+- **Parse Time**: Parsing typically takes less than 10ms for standard LUTs
+- **Memory**: Stored as Float32Array (~20KB in memory)
+- **Caching**: Web LUTs automatically caches parsed LUTs to avoid re-parsing
+
+<Info>
+  The library uses `Float32Array` internally for optimal WebGL performance and memory efficiency.
+</Info>

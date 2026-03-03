@@ -1,0 +1,246 @@
+---
+title: ColorGrader.loadCustomCube()
+description: Load a custom .cube LUT file from URL or text content
+---
+
+## Signature
+
+```typescript
+ColorGrader.loadCustomCube(urlOrText: string): Promise<string>
+```
+
+## Description
+
+Loads a custom .cube LUT file and returns a handle that can be used with other ColorGrader methods. The .cube format is an industry-standard 3D LUT format supported by professional color grading software like DaVinci Resolve, Adobe Premiere Pro, and Final Cut Pro.
+
+This method accepts either:
+- A URL to a .cube file (fetched via network)
+- Raw .cube file content as a string (parsed directly)
+
+## Parameters
+
+<ParamField path="urlOrText" type="string" required>
+  Either a URL to a .cube file or the raw .cube file content as a string.
+  
+  **URL example:** `/luts/my-custom-lut.cube` or `https://example.com/lut.cube`
+  
+  **Raw content example:** A string starting with `TITLE` or `LUT_3D_SIZE`
+</ParamField>
+
+## Return Value
+
+<ResponseField name="handle" type="Promise<string>">
+  A Promise that resolves to a unique handle string that can be used as the `mode` parameter in other methods:
+  - `apply({ mode: handle })`
+  - `setMode(handle)`
+  - `init({ mode: handle })`
+  
+  The handle format is `custom_<timestamp>` (e.g., `custom_1699123456789`)
+  
+  Returns `'custom_error'` if loading or parsing fails
+</ResponseField>
+
+## Examples
+
+### Load from URL
+
+```javascript
+const customHandle = await ColorGrader.loadCustomCube('/luts/my-lut.cube');
+
+// Use the custom LUT
+await ColorGrader.apply({ 
+  target: '.hero-image',
+  mode: customHandle
+});
+```
+
+### Load from External URL
+
+```javascript
+const handle = await ColorGrader.loadCustomCube(
+  'https://example.com/professional-grade.cube'
+);
+
+ColorGrader.init({ mode: handle });
+```
+
+### Load from Raw Content
+
+```javascript
+const cubeContent = `TITLE "My Custom LUT"
+LUT_3D_SIZE 17
+
+0.000000 0.000000 0.000000
+0.062500 0.000000 0.000000
+0.125000 0.000000 0.000000
+...
+`;
+
+const handle = await ColorGrader.loadCustomCube(cubeContent);
+await ColorGrader.setMode(handle);
+```
+
+### Upload and Apply User's LUT
+
+```javascript
+const fileInput = document.querySelector('#lut-upload');
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const text = await file.text();
+  const handle = await ColorGrader.loadCustomCube(text);
+  
+  if (handle !== 'custom_error') {
+    await ColorGrader.apply({ 
+      target: '#preview',
+      mode: handle
+    });
+  }
+});
+```
+
+```html
+<input type="file" id="lut-upload" accept=".cube">
+```
+
+### Load Multiple Custom LUTs
+
+```javascript
+const luts = {
+  myLut1: await ColorGrader.loadCustomCube('/luts/style-a.cube'),
+  myLut2: await ColorGrader.loadCustomCube('/luts/style-b.cube'),
+  myLut3: await ColorGrader.loadCustomCube('/luts/style-c.cube'),
+};
+
+// Switch between custom LUTs
+document.querySelector('#style-a-btn').addEventListener('click', () => {
+  ColorGrader.setMode(luts.myLut1);
+});
+
+document.querySelector('#style-b-btn').addEventListener('click', () => {
+  ColorGrader.setMode(luts.myLut2);
+});
+```
+
+### Fetch and Load
+
+```javascript
+try {
+  const response = await fetch('/api/get-user-lut');
+  const cubeText = await response.text();
+  const handle = await ColorGrader.loadCustomCube(cubeText);
+  
+  await ColorGrader.apply({ 
+    target: '.gallery',
+    mode: handle,
+    strength: 0.8
+  });
+} catch (error) {
+  console.error('Failed to load custom LUT:', error);
+}
+```
+
+## .cube File Format
+
+The .cube format is a text-based 3D LUT format. Example structure:
+
+```
+TITLE "My Custom LUT"
+LUT_3D_SIZE 17
+
+# R G B values (0.0 to 1.0) for each point in the 3D cube
+0.000000 0.000000 0.000000
+0.062500 0.000000 0.000000
+0.125000 0.000000 0.000000
+...
+1.000000 1.000000 1.000000
+```
+
+Key elements:
+- `TITLE` - Optional descriptive title
+- `LUT_3D_SIZE` - Grid size (typically 17, 33, or 65)
+- RGB triplets - One per line, space-separated floats from 0.0 to 1.0
+
+## Behavior
+
+### URL Detection
+
+The method automatically detects whether the input is a URL or raw content:
+- If the string starts with `TITLE` or `LUT_3D_SIZE`, it's treated as raw content
+- Otherwise, it's treated as a URL and fetched via `fetch()`
+
+### Handle Generation
+
+Each loaded custom LUT receives a unique handle in the format:
+```
+custom_<timestamp>
+```
+
+This ensures multiple custom LUTs can coexist without conflicts.
+
+### Caching
+
+Loaded custom LUTs are cached internally. The same handle can be reused across multiple `apply()`, `setMode()`, and `init()` calls without reloading.
+
+### Error Handling
+
+If loading or parsing fails:
+- An error is logged to the console
+- The method returns `'custom_error'` instead of throwing
+- You should check the return value before using it
+
+## Where to Get .cube Files
+
+### Create Your Own
+- **DaVinci Resolve** - Export LUTs after color grading
+- **Adobe Premiere Pro** - Export Lumetri Looks as .cube
+- **Final Cut Pro** - Export custom LUT files
+
+### Download Free LUTs
+- Search for "free .cube LUTs" online
+- Many filmmakers and colorists share LUTs
+- Popular sites: RocketStock, Color Grading Central, PremiumBeat
+
+### Purchase Professional LUTs
+- Professional colorist packs
+- Film emulation LUTs
+- Brand-specific looks (e.g., "Blockbuster", "Vintage Film")
+
+## Notes
+
+<Warning>
+  Large .cube files (size 65 or higher) may impact performance. For web use, size 17 or 33 is recommended.
+</Warning>
+
+<Note>
+  The returned handle is specific to the current page session. If you reload the page, you'll need to call `loadCustomCube()` again.
+</Note>
+
+<Tip>
+  For frequently used custom LUTs, consider bundling them with your application and loading them at initialization time.
+</Tip>
+
+## Error Handling Example
+
+```javascript
+const handle = await ColorGrader.loadCustomCube('/luts/custom.cube');
+
+if (handle === 'custom_error') {
+  console.error('Failed to load LUT, falling back to preset');
+  await ColorGrader.setMode('cinematic');
+} else {
+  await ColorGrader.setMode(handle);
+}
+```
+
+## SSR Safety
+
+This method is SSR-safe and will return `'custom'` when called in a server environment.
+
+## See Also
+
+- [apply()](/api/apply) - Use the loaded custom LUT
+- [setMode()](/api/set-mode) - Switch to a loaded custom LUT
+- [ColorGrader](/api/color-grader) - Overview and built-in presets

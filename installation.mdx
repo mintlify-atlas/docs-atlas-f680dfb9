@@ -1,0 +1,84 @@
+---
+title: Installation
+description: Install Web LUTs in your project using npm, yarn, or pnpm
+---
+
+Web LUTs is distributed as an npm package and can be installed using your preferred package manager.
+
+## Package Manager Installation
+
+Choose your preferred package manager to install Web LUTs:
+
+<CodeGroup>
+```bash npm
+npm install web-luts
+```
+
+```bash yarn
+yarn add web-luts
+```
+
+```bash pnpm
+pnpm add web-luts
+```
+</CodeGroup>
+
+## Requirements
+
+Web LUTs requires:
+- A modern browser with WebGL support (WebGL 2.0 recommended, fallback to WebGL 1.0)
+- Node.js 16+ (for development)
+- TypeScript 5+ (optional, for type support)
+
+<Note>
+Web LUTs is SSR-safe and will safely no-op when run on the server, making it compatible with Next.js, Nuxt, and other server-rendered frameworks.
+</Note>
+
+## Module Format
+
+Web LUTs supports both ESM and CommonJS:
+
+```js
+// ESM (recommended)
+import { ColorGrader } from 'web-luts';
+
+// CommonJS
+const { ColorGrader } = require('web-luts');
+```
+
+## TypeScript Support
+
+The package includes TypeScript definitions out of the box. No additional `@types` package is needed.
+
+```typescript
+import { ColorGrader, type InitOptions, type ParsedLut } from 'web-luts';
+
+const options: InitOptions = {
+  mode: 'cinematic',
+  strength: 0.8,
+  selector: 'img',
+  autoload: true
+};
+
+ColorGrader.init(options);
+```
+
+## CDN Usage
+
+While not recommended for production, you can also load Web LUTs from a CDN for quick prototyping:
+
+```html
+<script type="module">
+  import { ColorGrader } from 'https://cdn.jsdelivr.net/npm/web-luts@latest/dist/index.js';
+  
+  ColorGrader.init({ mode: 'cinematic' });
+</script>
+```
+
+<Tip>
+For production use, we recommend installing via npm to ensure version stability and optimal bundling.
+</Tip>
+
+## Next Steps
+
+Now that you have Web LUTs installed, head over to the [Quick Start](/quickstart) guide to learn how to use it in your project.

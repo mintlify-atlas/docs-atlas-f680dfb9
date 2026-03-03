@@ -1,0 +1,368 @@
+---
+title: Server-Side Rendering (SSR)
+description: Use Web LUTs safely in SSR frameworks like Next.js, Nuxt, and SvelteKit
+---
+
+## SSR Safety
+
+Web LUTs is designed to be SSR-safe and will gracefully no-op on the server where browser APIs like WebGL and DOM are unavailable.
+
+### Browser Detection
+
+The library includes a browser guard at the top level (src/index.ts:17):
+
+```ts
+const isBrowser = typeof window !== 'undefined';
+```
+
+All methods check this guard before executing:
+
+```ts
+public static init(options: InitOptions = {}): void {
+  if (!isBrowser) return;
+  // ... browser-only code
+}
+
+public static async apply(options: ApplyOptions): Promise<...> {
+  if (!isBrowser) return null;
+  // ... browser-only code
+}
+```
+
+This ensures:
+- No runtime errors on the server
+- No undefined `window` or `document` access
+- No WebGL context creation attempts
+- Zero server-side overhead
+
+## Next.js Integration
+
+### App Router (Next.js 13+)
+
+Mark components that use Web LUTs as client components:
+
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+import { ColorGrader } from 'web-luts';
+
+export default function ImageGallery() {
+  useEffect(() => {
+    ColorGrader.init({
+      mode: 'cinematic',
+      selector: '.gallery img'
+    });
+    
+    return () => {
+      ColorGrader.dispose();
+    };
+  }, []);
+  
+  return (
+    <div className="gallery">
+      <img src="/photo1.jpg" alt="Photo 1" crossOrigin="anonymous" />
+      <img src="/photo2.jpg" alt="Photo 2" crossOrigin="anonymous" />
+    </div>
+  );
+}
+```
+
+<Warning>
+  Don't forget the `'use client'` directive at the top of files that import Web LUTs. Without it, Next.js will try to execute the code on the server.
+</Warning>
+
+### Pages Router (Next.js 12 and earlier)
+
+Use dynamic imports with `ssr: false`:
+
+```tsx
+import dynamic from 'next/dynamic';
+
+const ImageGrader = dynamic(
+  () => import('../components/ImageGrader'),
+  { ssr: false }
+);
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Gallery</h1>
+      <ImageGrader />
+    </div>
+  );
+}
+```
+
+In the component file:
+
+```tsx
+// components/ImageGrader.tsx
+import { useEffect } from 'react';
+import { ColorGrader } from 'web-luts';
+
+export default function ImageGrader() {
+  useEffect(() => {
+    ColorGrader.init({ mode: 'cinematic' });
+    
+    return () => ColorGrader.dispose();
+  }, []);
+  
+  return <img src="/hero.jpg" alt="Hero" crossOrigin="anonymous" />;
+}
+```
+
+## Nuxt.js Integration
+
+### Nuxt 3
+
+Use the `<ClientOnly>` component:
+
+```vue
+<template>
+  <ClientOnly>
+    <div class="gallery">
+      <img src="/photo1.jpg" alt="Photo 1" crossorigin="anonymous" />
+      <img src="/photo2.jpg" alt="Photo 2" crossorigin="anonymous" />
+    </div>
+  </ClientOnly>
+</template>
+
+<script setup>
+import { onMounted, onUnmounted } from 'vue';
+import { ColorGrader } from 'web-luts';
+
+onMounted(() => {
+  ColorGrader.init({
+    mode: 'vintage',
+    selector: '.gallery img'
+  });
+});
+
+onUnmounted(() => {
+  ColorGrader.dispose();
+});
+</script>
+```
+
+### Nuxt 2
+
+Create a client-only plugin:
+
+```js
+// plugins/web-luts.client.js
+import { ColorGrader } from 'web-luts';
+
+export default ({ app }, inject) => {
+  inject('colorGrader', ColorGrader);
+};
+```
+
+Register it in `nuxt.config.js`:
+
+```js
+export default {
+  plugins: [
+    { src: '~/plugins/web-luts.client.js', mode: 'client' }
+  ]
+}
+```
+
+Use in components:
+
+```vue
+<template>
+  <img ref="hero" src="/hero.jpg" alt="Hero" crossorigin="anonymous" />
+</template>
+
+<script>
+export default {
+  mounted() {
+    this.$colorGrader.apply({
+      target: this.$refs.hero,
+      mode: 'cinematic'
+    });
+  },
+  
+  beforeDestroy() {
+    this.$colorGrader.dispose();
+  }
+}
+</script>
+```
+
+## SvelteKit Integration
+
+Check for browser environment before importing:
+
+```svelte
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
+  
+  let ColorGrader;
+  
+  onMount(async () => {
+    if (browser) {
+      const module = await import('web-luts');
+      ColorGrader = module.ColorGrader;
+      
+      ColorGrader.init({
+        mode: 'cinematic',
+        selector: '.gallery img'
+      });
+    }
+  });
+  
+  onDestroy(() => {
+    if (browser && ColorGrader) {
+      ColorGrader.dispose();
+    }
+  });
+</script>
+
+<div class="gallery">
+  <img src="/photo1.jpg" alt="Photo 1" crossorigin="anonymous" />
+  <img src="/photo2.jpg" alt="Photo 2" crossorigin="anonymous" />
+</div>
+```
+
+## Astro Integration
+
+Use client directives to hydrate components:
+
+```astro
+---
+import ImageGallery from '../components/ImageGallery.jsx';
+---
+
+<ImageGallery client:load />
+```
+
+In the component:
+
+```jsx
+// components/ImageGallery.jsx
+import { useEffect } from 'react';
+import { ColorGrader } from 'web-luts';
+
+export default function ImageGallery() {
+  useEffect(() => {
+    ColorGrader.init({ mode: 'cinematic' });
+    return () => ColorGrader.dispose();
+  }, []);
+  
+  return (
+    <img src="/hero.jpg" alt="Hero" crossOrigin="anonymous" />
+  );
+}
+```
+
+Available client directives:
+- `client:load` - Hydrates immediately on page load
+- `client:idle` - Hydrates when the browser is idle
+- `client:visible` - Hydrates when the component enters viewport
+
+## Remix Integration
+
+Remix runs code on both server and client. Wrap Web LUTs in browser checks:
+
+```tsx
+import { useEffect } from 'react';
+
+export default function GalleryPage() {
+  useEffect(() => {
+    // This only runs in the browser
+    import('web-luts').then(({ ColorGrader }) => {
+      ColorGrader.init({
+        mode: 'vintage',
+        selector: 'img'
+      });
+    });
+    
+    return () => {
+      import('web-luts').then(({ ColorGrader }) => {
+        ColorGrader.dispose();
+      });
+    };
+  }, []);
+  
+  return (
+    <div>
+      <img src="/photo.jpg" alt="Photo" crossOrigin="anonymous" />
+    </div>
+  );
+}
+```
+
+## Common SSR Pitfalls
+
+<Warning>
+  **Don't import at the top level in SSR contexts**
+  
+  ```tsx
+  // ❌ Bad - runs on server
+  import { ColorGrader } from 'web-luts';
+  ColorGrader.init({ mode: 'vintage' });
+  
+  // ✅ Good - runs only in browser
+  useEffect(() => {
+    import('web-luts').then(({ ColorGrader }) => {
+      ColorGrader.init({ mode: 'vintage' });
+    });
+  }, []);
+  ```
+</Warning>
+
+### Issue: "window is not defined"
+
+If you see this error, you're importing Web LUTs in a server context. Use one of the integration patterns above.
+
+### Issue: Images not processing after hydration
+
+Ensure `ColorGrader.init()` or `apply()` is called after the DOM is ready:
+
+```tsx
+useEffect(() => {
+  // Wait for images to load
+  const images = document.querySelectorAll('img');
+  const promises = Array.from(images).map(img => 
+    img.complete ? Promise.resolve() : 
+    new Promise(resolve => img.addEventListener('load', resolve, { once: true }))
+  );
+  
+  Promise.all(promises).then(() => {
+    ColorGrader.init({ mode: 'cinematic' });
+  });
+}, []);
+```
+
+### Issue: LUTs not loading from relative paths
+
+In SSR frameworks, `import.meta.url` may resolve differently. Host .cube files in the `public/` directory and load via absolute paths:
+
+```js
+await ColorGrader.loadCustomCube('/luts/my-custom.cube');
+```
+
+## TypeScript with SSR
+
+To avoid type errors in SSR environments, use type-only imports when needed:
+
+```tsx
+import type { ParsedLut, ApplyOptions } from 'web-luts';
+
+function MyComponent() {
+  useEffect(() => {
+    import('web-luts').then(({ ColorGrader }) => {
+      const options: ApplyOptions = {
+        target: '#hero',
+        mode: 'cinematic'
+      };
+      ColorGrader.apply(options);
+    });
+  }, []);
+}
+```
+
+Type-only imports are stripped during compilation and won't cause server-side issues.

@@ -1,0 +1,437 @@
+---
+title: "WebGL Rendering Pipeline"
+description: "Deep dive into how Web LUTs uses WebGL for hardware-accelerated color grading with 3D textures and fallback strategies"
+---
+
+## Overview
+
+Web LUTs leverages **WebGL** (Web Graphics Library) to apply color grading transformations directly on the GPU. This approach provides:
+
+- **Hardware Acceleration**: Offloads color processing to the GPU
+- **Real-time Performance**: Processes images in milliseconds, not seconds
+- **High Quality**: Uses trilinear interpolation for smooth color transitions
+- **Browser Compatibility**: Works in all modern browsers with automatic fallbacks
+
+## WebGL 2.0 vs WebGL 1.0
+
+The library automatically detects and uses the best available WebGL version:
+
+| Feature | WebGL 2.0 | WebGL 1.0 |
+|---------|-----------|----------|
+| **3D Textures** | Native support | Simulated with 2D textures |
+| **Performance** | Optimal | Good |
+| **Shader Complexity** | Simpler | More complex |
+| **Browser Support** | Modern browsers (2017+) | All browsers with WebGL |
+
+```typescript
+// From glEngine.ts:51-55
+this.gl = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl')!;
+this.isWebGL2 = !!(this.gl as WebGL2RenderingContext).texImage3D;
+
+console.log("WebGL version:", this.isWebGL2 ? "WebGL 2.0" : "WebGL 1.0");
+```
+
+<Info>
+  Web LUTs automatically selects the appropriate shaders and texture format based on detected WebGL capabilities. No configuration required.
+</Info>
+
+## The GlEngine Class
+
+The `GlEngine` class (`glEngine.ts`) encapsulates all WebGL operations:
+
+```typescript
+export class GlEngine {
+  private gl: WebGLRenderingContext | WebGL2RenderingContext;
+  private program: WebGLProgram;
+  private textureCache: Map<string, WebGLTexture>;
+  private imageTexture: WebGLTexture | null;
+  private lutTexture: WebGLTexture | null;
+  // ...
+}
+```
+
+### Key Components
+
+1. **GL Context**: The WebGL rendering context
+2. **Shader Program**: Compiled vertex and fragment shaders
+3. **Texture Cache**: Stores loaded LUTs to avoid re-uploading
+4. **Buffers**: Vertex positions and texture coordinates
+5. **Framebuffer**: For off-screen rendering (if needed)
+
+## Initialization Pipeline
+
+When a `GlEngine` is created, it follows this initialization sequence:
+
+### 1. Canvas Setup
+
+```typescript
+// From glEngine.ts:44-49
+this.canvas = options.canvas || document.createElement('canvas');
+if (!options.canvas) {
+  this.canvas.style.display = 'none';
+  document.body.appendChild(this.canvas);
+}
+```
+
+A hidden canvas is created if not provided, enabling off-screen processing.
+
+### 2. Shader Compilation
+
+```typescript
+// From glEngine.ts:82-84
+const vsSource = this.isWebGL2 ? vertexShaderWebGL2 : vertexShaderWebGL1;
+const fsSource = this.isWebGL2 ? fragmentShaderWebGL2 : fragmentShaderWebGL1;
+```
+
+Different shaders are loaded based on WebGL version:
+
+- **Vertex Shader**: Positions the full-screen quad
+- **Fragment Shader**: Performs the LUT lookup and color transformation
+
+### 3. Buffer Creation
+
+```typescript
+// From glEngine.ts:162-167
+const positions = [
+  -1.0, -1.0,  // Bottom left
+   1.0, -1.0,  // Bottom right
+  -1.0,  1.0,  // Top left
+   1.0,  1.0,  // Top right
+];
+```
+
+A full-screen quad is created using two triangles in a triangle strip.
+
+## 3D Texture Implementation (WebGL 2.0)
+
+WebGL 2.0 has native support for 3D textures, making LUT implementation straightforward:
+
+### Uploading the LUT
+
+```typescript
+// From glEngine.ts:266-284
+if (this.isWebGL2) {
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+  
+  (gl as WebGL2RenderingContext).texImage3D(
+    gl.TEXTURE_3D,
+    0,
+    gl.RGB,
+    lut.size,    // Width
+    lut.size,    // Height  
+    lut.size,    // Depth
+    0,
+    gl.RGB,
+    gl.FLOAT,
+    lutData
+  );
+}
+```
+
+### Shader Lookup (WebGL 2.0)
+
+In the fragment shader, a 3D texture lookup is straightforward:
+
+```glsl
+#version 300 es
+precision highp float;
+precision highp sampler3D;
+
+uniform sampler2D uImage;
+uniform sampler3D uLut;    // 3D texture sampler
+uniform float uStrength;
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+
+void main() {
+  vec4 color = texture(uImage, vTexCoord);
+  
+  // Direct 3D texture lookup
+  vec3 gradedColor = texture(uLut, color.rgb).rgb;
+  
+  // Blend based on strength
+  vec3 finalColor = mix(color.rgb, gradedColor, uStrength);
+  fragColor = vec4(finalColor, color.a);
+}
+```
+
+<Note>
+  The 3D texture sampler directly uses RGB values as 3D coordinates, making the lookup extremely efficient.
+</Note>
+
+## 2D Texture Fallback (WebGL 1.0)
+
+WebGL 1.0 doesn't support 3D textures, so Web LUTs uses a clever workaround: **tiled 2D textures**.
+
+### Flattening Strategy
+
+A 3D LUT cube is unwrapped into a 2D texture by placing "slices" side by side:
+
+```
+3D Cube (17×17×17)  →  2D Texture (289×17)
+                       (17² × 17)
+```
+
+```typescript
+// From glEngine.ts:290-316
+if (!this.isWebGL2) {
+  const flattenedData = this.flattenLutTo2D(lut, lutData);
+  
+  const width = lut.size * lut.size;  // 17 × 17 = 289
+  const height = lut.size;            // 17
+  
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGB,
+    width,
+    height,
+    0,
+    gl.RGB,
+    gl.FLOAT,
+    flattenedData
+  );
+}
+```
+
+### Flattening Algorithm
+
+The `flattenLutTo2D` method (glEngine.ts:331-401) rearranges the 3D data:
+
+```typescript
+// From glEngine.ts:344-368 (simplified)
+for (let b = 0; b < size; b++) {
+  for (let g = 0; g < size; g++) {
+    for (let r = 0; r < size; r++) {
+      // Calculate 1D index
+      const index = r + g * size + b * size * size;
+      
+      // Convert to 2D coordinates
+      const x = index % width;
+      const y = Math.floor(index / width);
+      
+      // Map to output array
+      const dstIdx = (y * width + x) * 3;
+      const srcIdx = b * size * size + g * size + r;
+      
+      flattenedData[dstIdx] = data[srcIdx][0];     // R
+      flattenedData[dstIdx + 1] = data[srcIdx][1]; // G
+      flattenedData[dstIdx + 2] = data[srcIdx][2]; // B
+    }
+  }
+}
+```
+
+### Shader Lookup (WebGL 1.0)
+
+The WebGL 1.0 fragment shader reconstructs the 3D lookup from the 2D texture:
+
+```glsl
+precision highp float;
+
+uniform sampler2D uImage;
+uniform sampler2D uLut;    // 2D texture (not 3D)
+uniform float uStrength;
+uniform float uSize;       // LUT size (e.g., 17.0)
+
+varying vec2 vTexCoord;
+
+void main() {
+  vec4 color = texture2D(uImage, vTexCoord);
+  
+  // Convert RGB to 1D index
+  float r = color.r * (uSize - 1.0);
+  float g = color.g * (uSize - 1.0);
+  float b = color.b * (uSize - 1.0);
+  
+  float index = floor(r) + floor(g) * uSize + floor(b) * uSize * uSize;
+  
+  // Convert 1D index back to 2D coordinates
+  float width = uSize * uSize;
+  float x = mod(index, width) / width;
+  float y = floor(index / width) / uSize;
+  
+  // Sample the 2D texture
+  vec3 gradedColor = texture2D(uLut, vec2(x, y)).rgb;
+  
+  vec3 finalColor = mix(color.rgb, gradedColor, uStrength);
+  gl_FragColor = vec4(finalColor, color.a);
+}
+```
+
+<Info>
+  While this approach is more complex, it provides nearly identical visual results to the 3D texture method with only a small performance penalty.
+</Info>
+
+## Rendering Pipeline
+
+When `engine.apply()` is called (glEngine.ts:409-549), the following steps occur:
+
+### 1. Canvas Sizing
+
+```typescript
+// From glEngine.ts:420-422
+this.canvas.width = image.width;
+this.canvas.height = image.height;
+gl.viewport(0, 0, image.width, image.height);
+```
+
+### 2. Image Texture Upload
+
+```typescript
+// From glEngine.ts:442-446
+gl.bindTexture(gl.TEXTURE_2D, this.imageTexture);
+gl.texImage2D(
+  gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image
+);
+```
+
+### 3. Uniform Configuration
+
+```typescript
+// From glEngine.ts:503-505
+gl.uniform1i(this.imageUniformLocation, 0);  // Texture unit 0
+gl.uniform1i(this.lutUniformLocation, 1);    // Texture unit 1
+gl.uniform1f(this.strengthUniformLocation, strength);
+```
+
+### 4. Texture Binding
+
+```typescript
+// From glEngine.ts:533-540
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, this.imageTexture);
+
+gl.activeTexture(gl.TEXTURE1);
+gl.bindTexture(
+  this.isWebGL2 ? gl.TEXTURE_3D : gl.TEXTURE_2D,
+  this.lutTexture
+);
+```
+
+### 5. Render Execution
+
+```typescript
+// From glEngine.ts:543-545
+gl.bindFramebuffer(gl.FRAMEBUFFER, null);  // Render to canvas
+gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);    // Draw quad
+```
+
+## Texture Parameters
+
+All textures are configured with optimal settings:
+
+```typescript
+// From glEngine.ts:225-244
+gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(target, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(target, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+```
+
+- **LINEAR filtering**: Smooth interpolation between texels
+- **CLAMP_TO_EDGE**: Prevents color wrapping at boundaries
+
+## Caching Strategy
+
+To optimize performance, Web LUTs caches loaded LUT textures:
+
+```typescript
+// From glEngine.ts:207-213
+if (this.textureCache.has(id)) {
+  console.log(`LUT '${id}' already loaded, using cached version`);
+  this.lutTexture = this.textureCache.get(id) || null;
+  this.currentLutId = id;
+  return;
+}
+```
+
+Benefits:
+- **Faster switching**: No re-upload when switching between LUTs
+- **Memory efficient**: Each LUT uploaded only once
+- **Smooth UX**: Instant preset changes
+
+## Resource Management
+
+The `dispose()` method (glEngine.ts:554-584) properly cleans up WebGL resources:
+
+```typescript
+public dispose(): void {
+  // Delete textures
+  for (const texture of this.textureCache.values()) {
+    gl.deleteTexture(texture);
+  }
+  
+  // Delete buffers
+  if (this.positionBuffer) gl.deleteBuffer(this.positionBuffer);
+  if (this.texCoordBuffer) gl.deleteBuffer(this.texCoordBuffer);
+  
+  // Delete framebuffer
+  if (this.framebuffer) gl.deleteFramebuffer(this.framebuffer);
+  
+  // Delete program
+  gl.deleteProgram(this.program);
+  
+  // Clear cache
+  this.textureCache.clear();
+}
+```
+
+<Note>
+  Always call `dispose()` when done with a `GlEngine` instance to prevent memory leaks, especially in single-page applications.
+</Note>
+
+## CORS Considerations
+
+WebGL has strict same-origin policies. The `apply.ts` module handles this:
+
+```typescript
+// From apply.ts:56-71
+if (image.src.startsWith('http') && !image.src.includes(window.location.host)) {
+  if (!image.hasAttribute('crossorigin')) {
+    console.warn('Adding crossorigin attribute for WebGL access');
+    image.setAttribute('crossorigin', 'anonymous');
+    
+    // Reload image with new attribute
+    if (image.complete) {
+      const originalSrc = image.src;
+      image.src = '';
+      setTimeout(() => {
+        image.src = originalSrc;
+      }, 0);
+    }
+  }
+}
+```
+
+<Info>
+  For external images, ensure your server sends the appropriate CORS headers:
+  ```
+  Access-Control-Allow-Origin: *
+  ```
+</Info>
+
+## Performance Characteristics
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| **Shader Compilation** | ~50-100ms | One-time cost on initialization |
+| **LUT Upload** | ~5-10ms | Cached after first upload |
+| **Image Processing** | ~1-5ms | Depends on image size |
+| **Canvas Export** | ~10-50ms | Converting canvas to data URL |
+
+### Optimization Tips
+
+1. **Reuse Engines**: Create one `GlEngine` per LUT, not per image
+2. **Preload LUTs**: Load commonly-used LUTs at startup
+3. **Batch Processing**: Process multiple images with the same LUT
+4. **Avoid Frequent Switches**: LUT switching requires texture rebinding
+
+## Browser Compatibility
+
+- **WebGL 2.0**: Chrome 56+, Firefox 51+, Safari 15+, Edge 79+
+- **WebGL 1.0**: All browsers with WebGL support (2011+)
+- **Fallback**: The library detects and uses the best available version
+
+No feature detection or manual configuration needed.

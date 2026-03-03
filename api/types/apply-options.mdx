@@ -1,0 +1,53 @@
+---
+title: ApplyOptions
+description: Options for applying color grading to specific images.
+---
+
+The `ApplyOptions` interface defines the configuration options for the `ColorGrader.apply()` method and the internal `apply()` function.
+
+## Properties
+
+<ParamField path="target" type="HTMLImageElement | NodeListOf<HTMLImageElement> | null" required>
+  The target image(s) to apply color grading to. Can be:
+  - A single `HTMLImageElement`
+  - A `NodeListOf<HTMLImageElement>` (e.g., from `querySelectorAll`)
+  - `null` (results in no operation)
+</ParamField>
+
+<ParamField path="mode" type="string" optional>
+  The LUT preset mode to apply. This can be any valid preset name or a custom LUT handle returned from `loadCustomCube()`.
+  
+  Either `mode` or `lut` should be provided.
+</ParamField>
+
+<ParamField path="lut" type="ParsedLut" optional>
+  A custom parsed LUT object to apply directly.
+  
+  Either `mode` or `lut` should be provided.
+</ParamField>
+
+<ParamField path="strength" type="number" optional>
+  The blend strength for the color grading effect, ranging from 0 to 1.
+  - `0` = no effect
+  - `1` = full effect
+  
+  **Default:** The default strength set during initialization, or `1.0` if not specified.
+</ParamField>
+
+<ParamField path="scope" type="string" optional>
+  Reserved for future use. Currently not implemented in the apply logic.
+</ParamField>
+
+## Usage Example
+
+```typescript
+import { ColorGrader } from 'web-luts';
+
+const image = document.querySelector('img');
+
+await ColorGrader.apply({
+  target: image,
+  mode: 'cinematic',
+  strength: 0.75
+});
+```

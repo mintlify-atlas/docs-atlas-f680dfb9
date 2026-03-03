@@ -1,0 +1,316 @@
+---
+title: ColorGrader.dispose()
+description: Clean up all resources and reset ColorGrader to initial state
+---
+
+## Signature
+
+```typescript
+ColorGrader.dispose(): void
+```
+
+## Description
+
+Cleans up all resources used by ColorGrader and resets the library to its initial state. This method should be called when you're done using ColorGrader to:
+
+- Free WebGL contexts and GPU memory
+- Reset all images to their original state
+- Clear custom LUT caches
+- Stop the MutationObserver
+- Reset internal state flags
+
+This is particularly important in single-page applications (SPAs) where components mount and unmount, or when you need to completely reinitialize ColorGrader with different settings.
+
+## Parameters
+
+This method takes no parameters.
+
+## Return Value
+
+<ResponseField name="void" type="void">
+  This method does not return a value
+</ResponseField>
+
+## Examples
+
+### Basic Cleanup
+
+```javascript
+ColorGrader.init({ mode: 'vintage' });
+
+// Later, when done
+ColorGrader.dispose();
+```
+
+### SPA Route Cleanup
+
+```javascript
+// React component
+import { useEffect } from 'react';
+import { ColorGrader } from 'web-luts';
+
+function ImageGallery() {
+  useEffect(() => {
+    ColorGrader.init({ 
+      mode: 'cinematic',
+      selector: '.gallery-image'
+    });
+    
+    return () => {
+      // Cleanup when component unmounts
+      ColorGrader.dispose();
+    };
+  }, []);
+  
+  return <div>{/* gallery content */}</div>;
+}
+```
+
+### Vue Component Cleanup
+
+```javascript
+import { ColorGrader } from 'web-luts';
+
+export default {
+  mounted() {
+    ColorGrader.init({ mode: 'vintage' });
+  },
+  
+  beforeUnmount() {
+    ColorGrader.dispose();
+  }
+};
+```
+
+### Svelte Component Cleanup
+
+```javascript
+import { onMount, onDestroy } from 'svelte';
+import { ColorGrader } from 'web-luts';
+
+onMount(() => {
+  ColorGrader.init({ mode: 'cinematic' });
+});
+
+onDestroy(() => {
+  ColorGrader.dispose();
+});
+```
+
+### Reinitialize with New Settings
+
+```javascript
+// Clean up old settings
+ColorGrader.dispose();
+
+// Reinitialize with new configuration
+ColorGrader.init({
+  mode: 'sci-fi',
+  strength: 0.5,
+  selector: '.new-selector'
+});
+```
+
+### Modal/Dialog Cleanup
+
+```javascript
+function openImageEditor() {
+  ColorGrader.init({ 
+    mode: 'normal',
+    selector: '#editor-preview'
+  });
+}
+
+function closeImageEditor() {
+  ColorGrader.dispose();
+  document.querySelector('#editor-modal').style.display = 'none';
+}
+```
+
+## What Gets Cleaned Up
+
+### 1. Image Reset
+
+All images are reset to their original state:
+```javascript
+this.reset();
+```
+
+### 2. WebGL Resources
+
+All WebGL contexts, textures, and buffers are disposed:
+```javascript
+disposeEngines();
+```
+
+This frees GPU memory and prevents memory leaks.
+
+### 3. Custom LUT Cache
+
+All loaded custom LUTs are cleared:
+```javascript
+this.customLuts.clear();
+```
+
+### 4. Internal State Reset
+
+The initialization flag is reset:
+```javascript
+this.initialized = false;
+```
+
+This stops the MutationObserver from processing new images.
+
+## Memory Management
+
+### WebGL Context Limits
+
+Browsers limit the number of WebGL contexts:
+- Chrome/Edge: ~16 contexts
+- Firefox: ~200 contexts
+- Safari: ~8 contexts
+
+Calling `dispose()` properly frees these contexts, preventing the error:
+```
+WARNING: Too many active WebGL contexts. Oldest context will be lost.
+```
+
+### Preventing Memory Leaks
+
+Without `dispose()`, you may leak:
+- WebGL contexts (limited resource)
+- GPU memory (textures, buffers)
+- DOM references (MutationObserver)
+- Cached LUT data
+
+## Use Cases
+
+### SPA Navigation
+
+```javascript
+// Router hook (example with Vue Router)
+router.beforeEach((to, from, next) => {
+  ColorGrader.dispose();
+  next();
+});
+```
+
+### Dynamic Content Loading
+
+```javascript
+function loadGallery(galleryId) {
+  // Clean up previous gallery
+  ColorGrader.dispose();
+  
+  // Load new gallery
+  fetchGalleryImages(galleryId).then(() => {
+    ColorGrader.init({ mode: 'cinematic' });
+  });
+}
+```
+
+### Testing/Development
+
+```javascript
+// Jest test example
+afterEach(() => {
+  ColorGrader.dispose();
+});
+
+test('applies vintage mode', () => {
+  ColorGrader.init({ mode: 'vintage' });
+  // assertions...
+});
+```
+
+### User Settings Toggle
+
+```javascript
+function disableColorGrading() {
+  localStorage.setItem('color-grading', 'disabled');
+  ColorGrader.dispose();
+}
+
+function enableColorGrading() {
+  localStorage.setItem('color-grading', 'enabled');
+  ColorGrader.init({ mode: 'cinematic' });
+}
+```
+
+### Memory-Constrained Environments
+
+```javascript
+// Free resources when tab becomes hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    ColorGrader.dispose();
+  } else {
+    ColorGrader.init({ mode: 'vintage' });
+  }
+});
+```
+
+## Important Notes
+
+<Warning>
+  Always call `dispose()` before calling `init()` again. Otherwise, you may create duplicate MutationObservers and leak resources.
+</Warning>
+
+<Note>
+  After calling `dispose()`, all custom LUTs loaded via `loadCustomCube()` are cleared. You'll need to reload them if you initialize ColorGrader again.
+</Note>
+
+<Tip>
+  In SPAs, always call `dispose()` in your component cleanup lifecycle methods (e.g., `useEffect` cleanup, `beforeUnmount`, `onDestroy`).
+</Tip>
+
+## Does Not Clear
+
+The following are NOT cleared by `dispose()`:
+- Preset LUT files (these remain cached by the browser)
+- Default PRESETS constant values
+- The ColorGrader class definition itself
+
+These are intentionally preserved for performance when reinitializing.
+
+## Behavior After Dispose
+
+After calling `dispose()`:
+
+```javascript
+ColorGrader.dispose();
+
+// These will work, but with defaults:
+ColorGrader.apply({ target: 'img', mode: 'vintage' }); // ✓ Works
+ColorGrader.setMode('cinematic'); // ✓ Works
+ColorGrader.setStrength(0.5); // ✓ Works
+
+// But automatic processing is disabled:
+// - MutationObserver is stopped
+// - No default mode/strength set
+// - Calling reset() won't work (no tracked images)
+```
+
+To restore full functionality, call `init()` again:
+
+```javascript
+ColorGrader.dispose();
+ColorGrader.init({ mode: 'cinematic' }); // ✓ Fully functional again
+```
+
+## Performance Impact
+
+- **GPU memory freed**: WebGL textures and buffers
+- **CPU memory freed**: LUT data, image references
+- **Event listeners removed**: MutationObserver disconnected
+- **Execution time**: < 10ms typically
+
+## SSR Safety
+
+This method is SSR-safe and will silently no-op when called in a server environment.
+
+## See Also
+
+- [init()](/api/init) - Initialize ColorGrader
+- [reset()](/api/reset) - Reset images without full cleanup
+- [ColorGrader](/api/color-grader) - Overview and usage patterns

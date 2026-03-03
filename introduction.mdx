@@ -1,0 +1,92 @@
+---
+title: Introduction to Web LUTs
+description: A lightweight TypeScript library for applying professional LUT color grading to web images with WebGL acceleration
+---
+
+Web LUTs is a powerful yet lightweight library that brings professional color grading to your web applications. Apply cinematic looks, vintage filters, and custom color grades to any image element with just a few lines of code.
+
+<img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNW1veTgwMm81am9ia3YwOWprbnlhYjc1OXl0c3ZlMGZvNWdxaDNkYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/J2awouDsf23R2ZtuP2/giphy.gif" alt="Web LUTs Demo" />
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="WebGL Accelerated" icon="bolt">
+    Supports WebGL 2.0 for high-performance 3D LUTs with automatic fallback to WebGL 1.0 using 2D tiled textures
+  </Card>
+  
+  <Card title="Built-in Presets" icon="palette">
+    Six professional presets including vintage, cinematic, serious-vintage, lights-out, and sci-fi looks
+  </Card>
+  
+  <Card title="Custom LUT Support" icon="file-import">
+    Load and apply your own .cube LUT files for complete creative control
+  </Card>
+  
+  <Card title="Flexible Control" icon="sliders">
+    Dynamically adjust grading strength and switch between looks in real-time
+  </Card>
+  
+  <Card title="SSR-Safe" icon="server">
+    Built with server-side rendering in mind - safely runs as no-op on the server
+  </Card>
+  
+  <Card title="Zero Dependencies" icon="feather">
+    Lightweight at under 10KB gzipped with full TypeScript support and no runtime dependencies
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Apply professional color grading to your images with just a few lines:
+
+```js
+import { ColorGrader } from 'web-luts';
+
+// Apply to all images at load time
+ColorGrader.init({ 
+  mode: 'cinematic',
+  strength: 0.8
+});
+
+// Or apply to specific images
+const heroImage = document.getElementById('hero');
+ColorGrader.apply({ 
+  target: heroImage, 
+  mode: 'vintage' 
+});
+```
+
+<Note>
+Web LUTs automatically processes images and maintains the original DOM structure by replacing them with canvas elements.
+</Note>
+
+## Get Started
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Web LUTs using npm, yarn, or pnpm
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes with working examples
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/color-grader">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Built-in Presets
+
+Web LUTs comes with six carefully crafted presets ready to use:
+
+- **normal** - No color grading (identity LUT)
+- **vintage** - Warm, faded film look
+- **cinematic** - Hollywood-style teal and orange
+- **serious-vintage** - Stronger vintage with more contrast
+- **lights-out** - Dark, moody look with blue shadows
+- **sci-fi** - Cool blue-green tint
+
+<Tip>
+You can control the intensity of any preset by adjusting the `strength` parameter from 0 to 1.
+</Tip>

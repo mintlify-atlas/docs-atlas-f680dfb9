@@ -1,0 +1,188 @@
+---
+title: ColorGrader.setStrength()
+description: Update the blending strength of color grading effects
+---
+
+## Signature
+
+```typescript
+ColorGrader.setStrength(strength: number, target?: HTMLImageElement | NodeListOf<HTMLImageElement> | string): Promise<void>
+```
+
+## Description
+
+Updates the blend strength of color grading effects. The strength controls how much the LUT affects the final image:
+- `0` = No effect (original image)
+- `1` = Full strength (complete LUT transformation)
+- `0.5` = 50% blend between original and graded
+
+When called without a `target`, this updates the default strength and reapplies to all previously processed images.
+
+## Parameters
+
+<ParamField path="strength" type="number" required>
+  The blend strength value. Range: 0-1
+  - `0.0` - No color grading effect (original image)
+  - `0.5` - 50% blend between original and color graded
+  - `1.0` - Full color grading effect
+</ParamField>
+
+<ParamField path="target" type="HTMLImageElement | NodeListOf<HTMLImageElement> | string" optional>
+  Optional target to apply the strength change to. Can be:
+  - A single `HTMLImageElement`
+  - A `NodeListOf<HTMLImageElement>` (e.g., from `querySelectorAll`)
+  - A CSS selector string
+  
+  If omitted, updates the default strength and reapplies to all images matching the selector set in `init()`
+</ParamField>
+
+## Return Value
+
+<ResponseField name="result" type="Promise<void>">
+  A Promise that resolves when the strength has been applied
+</ResponseField>
+
+## Examples
+
+### Update Global Strength
+
+Change strength for all initialized images:
+
+```javascript
+// Initialize with default strength
+ColorGrader.init({ mode: 'vintage' });
+
+// Later, reduce the effect
+await ColorGrader.setStrength(0.5);
+```
+
+### Create a Strength Slider
+
+```javascript
+const slider = document.querySelector('#strength-slider');
+
+slider.addEventListener('input', (e) => {
+  const strength = parseFloat(e.target.value);
+  ColorGrader.setStrength(strength);
+});
+```
+
+```html
+<input 
+  type="range" 
+  id="strength-slider" 
+  min="0" 
+  max="1" 
+  step="0.1" 
+  value="1"
+>
+```
+
+### Update Strength for Specific Image
+
+```javascript
+const heroImage = document.getElementById('hero');
+await ColorGrader.setStrength(0.7, heroImage);
+```
+
+### Update Strength Using Selector
+
+```javascript
+// Apply 60% strength to all gallery images
+await ColorGrader.setStrength(0.6, '.gallery-image');
+```
+
+### Progressive Strength Animation
+
+```javascript
+async function animateStrength(targetStrength, duration = 1000) {
+  const startStrength = 0;
+  const startTime = Date.now();
+  
+  function update() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const currentStrength = startStrength + (targetStrength - startStrength) * progress;
+    
+    ColorGrader.setStrength(currentStrength);
+    
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    }
+  }
+  
+  update();
+}
+
+// Fade in the color grading effect over 2 seconds
+await animateStrength(1.0, 2000);
+```
+
+## Behavior
+
+### Default Strength Update
+
+When called without a `target`:
+1. Updates the internal default strength value
+2. Reapplies color grading to all images matching the selector from `init()`
+3. This becomes the new default for future `apply()` calls
+
+### Targeted Strength Update
+
+When called with a `target`:
+1. Applies the new strength only to the specified target(s)
+2. Does not change the default strength for other images
+3. Uses the current default mode for the color grading
+
+### Live Updates
+
+The method immediately reprocesses images with the new strength value, making it ideal for:
+- Real-time sliders and controls
+- Interactive before/after comparisons
+- Fade-in/fade-out effects
+
+## Use Cases
+
+### Before/After Comparison
+
+```javascript
+let showBefore = false;
+
+document.querySelector('#compare-btn').addEventListener('click', () => {
+  showBefore = !showBefore;
+  ColorGrader.setStrength(showBefore ? 0 : 1);
+});
+```
+
+### Conditional Strength Based on User Preference
+
+```javascript
+const userPrefersSubtle = localStorage.getItem('subtle-effects') === 'true';
+ColorGrader.setStrength(userPrefersSubtle ? 0.4 : 1.0);
+```
+
+### Different Strength Per Image Group
+
+```javascript
+// Subtle effect on thumbnails
+await ColorGrader.setStrength(0.3, '.thumbnail');
+
+// Full effect on hero images
+await ColorGrader.setStrength(1.0, '.hero-image');
+```
+
+## Performance Notes
+
+<Note>
+  Each call to `setStrength()` triggers WebGL reprocessing of the target images. For smooth animations, use `requestAnimationFrame()` and avoid excessive calls (aim for 30-60fps max).
+</Note>
+
+## SSR Safety
+
+This method is SSR-safe and will silently no-op when called in a server environment.
+
+## See Also
+
+- [setMode()](/api/set-mode) - Change the color grading preset
+- [apply()](/api/apply) - Apply color grading with specific options
+- [init()](/api/init) - Set initial default strength

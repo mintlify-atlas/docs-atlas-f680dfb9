@@ -1,0 +1,252 @@
+---
+title: Custom LUTs
+description: Load and apply your own .cube LUT files for custom color grading effects
+---
+
+## Loading Custom CUBE Files
+
+Web LUTs supports loading custom .cube files (the industry-standard 3D LUT format) from a URL or raw text content.
+
+### From a URL
+
+<Steps>
+  <Step title="Upload your .cube file">
+    Host your .cube file on your server or a CDN:
+    
+    ```js
+    const handle = await ColorGrader.loadCustomCube(
+      'https://example.com/my-custom-lut.cube'
+    );
+    ```
+  </Step>
+  
+  <Step title="Apply the custom LUT">
+    Use the returned handle as the `mode` parameter:
+    
+    ```js
+    await ColorGrader.apply({
+      target: '#hero',
+      mode: handle,
+      strength: 1.0
+    });
+    ```
+    
+    The handle is a unique identifier like `custom_1234567890` generated from the timestamp. See src/index.ts:202 for the handle generation.
+  </Step>
+</Steps>
+
+### From Raw Text Content
+
+You can also load a .cube file from raw text (useful when embedding LUT data directly):
+
+```js
+const cubeContent = `
+TITLE "My Custom LUT"
+LUT_3D_SIZE 17
+
+0.0 0.0 0.0
+0.0625 0.0 0.0
+0.125 0.0 0.0
+...
+`;
+
+const handle = await ColorGrader.loadCustomCube(cubeContent);
+```
+
+The library detects whether the input is a URL or raw content by checking if it starts with `TITLE` or `LUT_3D_SIZE`. See src/index.ts:191 for the detection logic.
+
+## CUBE File Format
+
+Web LUTs parses standard .cube files with the following structure:
+
+```
+TITLE "LUT Name"
+LUT_3D_SIZE 17
+
+# RGB values from 0.0 to 1.0
+0.0 0.0 0.0
+0.0625 0.0 0.0
+0.125 0.0 0.0
+...
+```
+
+<Warning>
+  The LUT must contain exactly `size³` entries. For a 17x17x17 LUT, that's 4,913 RGB triplets. Missing or extra entries will cause parsing errors.
+</Warning>
+
+## Creating LUTs Programmatically
+
+For advanced use cases, you can create LUT data structures directly:
+
+### Identity LUT
+
+Create a neutral LUT (no color change):
+
+```js
+import { createIdentityLut } from 'web-luts';
+
+const identityLut = createIdentityLut(17);
+
+await ColorGrader.apply({
+  target: '#hero',
+  lut: identityLut,
+  strength: 1.0
+});
+```
+
+See examples/index.html:310 for a working example using identity LUTs.
+
+### Custom Color Transformation
+
+Build a LUT from scratch with custom color transformations:
+
+```js
+function createWarmLut(size = 17) {
+  const data = [];
+  
+  for (let b = 0; b < size; b++) {
+    for (let g = 0; g < size; g++) {
+      for (let r = 0; r < size; r++) {
+        // Normalize to [0, 1]
+        const normR = r / (size - 1);
+        const normG = g / (size - 1);
+        const normB = b / (size - 1);
+        
+        // Apply warm tint: boost red, reduce blue
+        const finalR = Math.min(1.0, normR * 1.1 + 0.05);
+        const finalG = normG;
+        const finalB = Math.max(0.0, normB * 0.9 - 0.05);
+        
+        data.push([finalR, finalG, finalB]);
+      }
+    }
+  }
+  
+  return { size, data, title: 'Warm' };
+}
+
+const warmLut = createWarmLut();
+
+await ColorGrader.apply({
+  target: '#hero',
+  lut: warmLut
+});
+```
+
+This pattern is used in src/presets/index.ts:95 for the programmatic preset fallbacks.
+
+## Data Structure Format
+
+LUT objects must match the `ParsedLut` interface:
+
+```ts
+interface ParsedLut {
+  size: number;                    // LUT dimensions (e.g., 17 for 17x17x17)
+  data: number[][] | Float32Array; // RGB triplets or flat array
+  title?: string;                  // Optional LUT name
+}
+```
+
+### Array Format
+
+An array of `[R, G, B]` triplets:
+
+```js
+{
+  size: 17,
+  data: [
+    [0.0, 0.0, 0.0],    // First voxel
+    [0.0625, 0.0, 0.0], // Second voxel
+    // ... 4,911 more entries for 17³
+  ],
+  title: 'My LUT'
+}
+```
+
+### Float32Array Format
+
+A flat array with interleaved RGB values:
+
+```js
+{
+  size: 17,
+  data: new Float32Array([
+    0.0, 0.0, 0.0,          // First voxel (R, G, B)
+    0.0625, 0.0, 0.0,       // Second voxel
+    // ... (size³ * 3) total values
+  ]),
+  title: 'My LUT'
+}
+```
+
+The WebGL engine handles both formats automatically. See src/core/glEngine.ts:248 for the conversion logic.
+
+## Managing Multiple Custom LUTs
+
+Custom LUTs are cached internally, so you can load multiple LUTs and switch between them:
+
+```js
+// Load several custom LUTs
+const vintage = await ColorGrader.loadCustomCube('/luts/vintage.cube');
+const modern = await ColorGrader.loadCustomCube('/luts/modern.cube');
+const bw = await ColorGrader.loadCustomCube('/luts/black-white.cube');
+
+// Switch between them
+await ColorGrader.setMode(vintage);
+await ColorGrader.setMode(modern);
+await ColorGrader.setMode(bw);
+```
+
+Custom LUTs are stored in a `Map<string, ParsedLut>` at src/index.ts:23.
+
+## Combining with Presets
+
+You can freely mix custom LUTs and built-in presets:
+
+```js
+const customHandle = await ColorGrader.loadCustomCube('/my-lut.cube');
+
+// Apply custom LUT to hero
+await ColorGrader.apply({
+  target: '#hero',
+  mode: customHandle
+});
+
+// Apply built-in preset to gallery
+await ColorGrader.apply({
+  target: '.gallery img',
+  mode: 'cinematic'
+});
+```
+
+## Error Handling
+
+<Warning>
+  Always wrap `loadCustomCube()` in a try/catch block. Invalid or malformed .cube files will throw parsing errors.
+</Warning>
+
+```js
+try {
+  const handle = await ColorGrader.loadCustomCube('/lut.cube');
+  await ColorGrader.setMode(handle);
+} catch (error) {
+  console.error('Failed to load custom LUT:', error);
+  // Fallback to a preset
+  await ColorGrader.setMode('normal');
+}
+```
+
+If `loadCustomCube()` fails, it returns `'custom_error'` as the handle (src/index.ts:210). Attempting to use this handle will fall back to the `normal` preset.
+
+## LUT Size Recommendations
+
+- **17x17x17** (4,913 entries) - Standard size, good balance of quality and file size
+- **33x33x33** (35,937 entries) - Higher quality, larger files
+- **64x64x64** (262,144 entries) - Professional quality, large files
+
+Larger LUTs provide more accurate color grading but increase:
+- Download time
+- WebGL texture memory usage
+- Initial processing time
+
+For web use, 17x17x17 or 33x33x33 is recommended.

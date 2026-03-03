@@ -1,0 +1,47 @@
+---
+title: InitOptions
+description: Configuration options for initializing the ColorGrader to apply to all images at load time.
+---
+
+The `InitOptions` interface defines the configuration options for the `ColorGrader.init()` method.
+
+## Properties
+
+<ParamField path="mode" type="string" optional>
+  The LUT preset mode to apply to images. Can be any valid preset from the PRESETS object.
+  
+  **Default:** `PRESETS.NORMAL`
+</ParamField>
+
+<ParamField path="strength" type="number" optional>
+  The blend strength for the color grading effect, ranging from 0 to 1.
+  - `0` = no effect
+  - `1` = full effect
+  
+  **Default:** `1.0`
+</ParamField>
+
+<ParamField path="selector" type="string" optional>
+  CSS selector to target specific images for automatic color grading.
+  
+  **Default:** `'img'`
+</ParamField>
+
+<ParamField path="autoload" type="boolean" optional>
+  Whether to preload all preset LUTs in the background at initialization time.
+  
+  **Default:** `true`
+</ParamField>
+
+## Usage Example
+
+```typescript
+import { ColorGrader } from 'web-luts';
+
+ColorGrader.init({
+  mode: 'vintage',
+  strength: 0.8,
+  selector: '.gallery img',
+  autoload: true
+});
+```

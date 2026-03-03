@@ -1,0 +1,258 @@
+---
+title: ColorGrader.reset()
+description: Reset images to their original state before color grading
+---
+
+## Signature
+
+```typescript
+ColorGrader.reset(target?: HTMLImageElement | NodeListOf<HTMLImageElement> | string): void
+```
+
+## Description
+
+Resets image(s) to their original state by restoring the original `src` attribute that was captured before color grading was applied. This effectively removes all color grading effects from the targeted images.
+
+When called without arguments, it resets all images that were processed via `init()`.
+
+## Parameters
+
+<ParamField path="target" type="HTMLImageElement | NodeListOf<HTMLImageElement> | string" optional>
+  Optional target to reset. Can be:
+  - A single `HTMLImageElement`
+  - A `NodeListOf<HTMLImageElement>` (e.g., from `querySelectorAll`)
+  - A CSS selector string
+  
+  If omitted, resets all images matching the selector that was set in `init()`
+</ParamField>
+
+## Return Value
+
+<ResponseField name="void" type="void">
+  This method does not return a value
+</ResponseField>
+
+## Examples
+
+### Reset All Images
+
+Reset all images that were initialized:
+
+```javascript
+ColorGrader.init({ mode: 'vintage' });
+
+// Later, remove all color grading
+ColorGrader.reset();
+```
+
+### Reset Specific Image
+
+```javascript
+const heroImage = document.getElementById('hero');
+ColorGrader.apply({ target: heroImage, mode: 'cinematic' });
+
+// Reset just this image
+ColorGrader.reset(heroImage);
+```
+
+### Reset Using Selector
+
+```javascript
+// Reset all gallery images
+ColorGrader.reset('.gallery-image');
+```
+
+### Reset Multiple Images
+
+```javascript
+const images = document.querySelectorAll('.product-image');
+ColorGrader.reset(images);
+```
+
+### Toggle Button
+
+```javascript
+let isGraded = true;
+
+document.querySelector('#toggle-grading').addEventListener('click', () => {
+  if (isGraded) {
+    ColorGrader.reset();
+  } else {
+    ColorGrader.apply({ target: 'img', mode: 'vintage' });
+  }
+  isGraded = !isGraded;
+});
+```
+
+### Before/After Comparison
+
+```javascript
+const compareBtn = document.querySelector('#compare-btn');
+
+compareBtn.addEventListener('mousedown', () => {
+  ColorGrader.reset('.hero-image');
+});
+
+compareBtn.addEventListener('mouseup', () => {
+  ColorGrader.apply({ 
+    target: '.hero-image', 
+    mode: 'cinematic' 
+  });
+});
+```
+
+```html
+<button id="compare-btn">Hold to See Original</button>
+```
+
+### Conditional Reset
+
+```javascript
+const userPreference = localStorage.getItem('color-grading');
+
+if (userPreference === 'disabled') {
+  ColorGrader.reset();
+}
+```
+
+## Behavior
+
+### Original Image Restoration
+
+The method restores images to their original state by:
+1. Looking up the original `src` value stored when color grading was first applied
+2. Setting the image's `src` back to the original value
+3. This triggers the browser to reload/display the original image
+
+### No Target Specified
+
+When called without a `target`:
+1. Queries all images matching the selector from `init()` (default: `'img'`)
+2. Resets each image to its original state
+
+### String Selector
+
+When called with a CSS selector string:
+1. Queries the DOM using `querySelectorAll()`
+2. Resets all matching images
+
+### NodeList
+
+When called with a `NodeListOf<HTMLImageElement>`:
+1. Iterates through the NodeList
+2. Resets each image individually
+
+### Single Image
+
+When called with a single `HTMLImageElement`:
+1. Directly resets that image to its original state
+
+### Images Not Previously Graded
+
+If you call `reset()` on images that were never color graded:
+- The method silently does nothing (no error)
+- The images remain unchanged
+
+## Use Cases
+
+### Settings Toggle
+
+```javascript
+const enableGradingCheckbox = document.querySelector('#enable-grading');
+
+enableGradingCheckbox.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    ColorGrader.init({ mode: 'cinematic' });
+  } else {
+    ColorGrader.reset();
+  }
+});
+```
+
+### Print Mode
+
+```javascript
+window.addEventListener('beforeprint', () => {
+  // Remove color grading for printing
+  ColorGrader.reset();
+});
+
+window.addEventListener('afterprint', () => {
+  // Reapply color grading after printing
+  ColorGrader.init({ mode: 'cinematic' });
+});
+```
+
+### Performance Optimization
+
+```javascript
+// Remove grading when scrolled out of view
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) {
+      ColorGrader.reset(entry.target);
+    } else {
+      ColorGrader.apply({ 
+        target: entry.target, 
+        mode: 'vintage' 
+      });
+    }
+  });
+});
+
+document.querySelectorAll('.heavy-image').forEach(img => {
+  observer.observe(img);
+});
+```
+
+### Cleanup Before Navigation
+
+```javascript
+// SPA route change
+router.beforeEach(() => {
+  ColorGrader.reset();
+});
+```
+
+## Important Notes
+
+<Note>
+  The `reset()` method only works on images that were previously processed by ColorGrader. It relies on internal tracking of original image sources.
+</Note>
+
+<Warning>
+  If the original image source is no longer available (e.g., the URL returned a 404), resetting will fail to display the image.
+</Warning>
+
+## Relationship with Other Methods
+
+### Reset vs. Strength 0
+
+Setting strength to 0 and resetting are different:
+
+```javascript
+// These are NOT the same:
+ColorGrader.setStrength(0);  // Applies identity LUT (minimal processing)
+ColorGrader.reset();          // Restores original src (no processing)
+```
+
+- `setStrength(0)` still processes the image through WebGL but with no blending
+- `reset()` completely restores the original image source
+
+### Reset Before Dispose
+
+The `dispose()` method calls `reset()` internally:
+
+```javascript
+ColorGrader.dispose(); // Calls reset() + cleanup
+```
+
+## SSR Safety
+
+This method is SSR-safe and will silently no-op when called in a server environment.
+
+## See Also
+
+- [dispose()](/api/dispose) - Reset and clean up all resources
+- [apply()](/api/apply) - Apply color grading (opposite of reset)
+- [setStrength()](/api/set-strength) - Reduce effect without fully resetting
