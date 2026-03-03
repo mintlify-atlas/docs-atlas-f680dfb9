@@ -1,0 +1,107 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Web LUTs",
+  "projectDescription": "A lightweight TypeScript library for applying LUT color grading to web images using WebGL",
+  "theme": "palm",
+  "primaryColor": "#FF6B35",
+  "lightColor": "#FFB58F",
+  "darkColor": "#D14422",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/luts",
+              "concepts/webgl-rendering",
+              "concepts/presets"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/basic-usage",
+              "guides/custom-luts",
+              "guides/performance",
+              "guides/ssr-support"
+            ]
+          },
+          {
+            "group": "Chrome Extension",
+            "pages": [
+              "extension/overview",
+              "extension/installation",
+              "extension/development"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/color-grader",
+              "api/init",
+              "api/apply",
+              "api/set-strength",
+              "api/set-mode",
+              "api/load-custom-cube",
+              "api/reset",
+              "api/dispose"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/init-options",
+              "api/types/apply-options",
+              "api/types/parsed-lut"
+            ]
+          },
+          {
+            "group": "Presets",
+            "pages": [
+              "api/presets"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "WebGL-based LUT color grading for high performance",
+    "Built-in presets (vintage, cinematic, sci-fi, etc.)",
+    "Load custom .cube LUT files",
+    "Control grading strength and intensity",
+    "SSR-safe with browser detection",
+    "TypeScript support with full type definitions",
+    "Zero runtime dependencies, < 10KB gzipped"
+  ],
+  "publicApiSurface": [
+    "ColorGrader.init(options?)",
+    "ColorGrader.apply(options)",
+    "ColorGrader.setStrength(strength, target?)",
+    "ColorGrader.setMode(mode, target?)",
+    "ColorGrader.loadCustomCube(urlOrText)",
+    "ColorGrader.reset(target?)",
+    "ColorGrader.dispose()",
+    "PRESETS.NORMAL",
+    "PRESETS.VINTAGE",
+    "PRESETS.CINEMATIC",
+    "PRESETS.SERIOUS_VINTAGE",
+    "PRESETS.LIGHTS_OUT",
+    "PRESETS.SCI_FI"
+  ]
+}
