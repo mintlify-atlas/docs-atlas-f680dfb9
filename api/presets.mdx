@@ -48,103 +48,39 @@ console.log(PRESETS.SCI_FI);          // 'sci-fi'
   Cool blue-green futuristic look. Reduced reds with boosted greens and blues for a technological, otherworldly feel.
 </ResponseField>
 
-## Functions
+## Using Presets
 
-### loadPreset()
-
-Loads a preset LUT by name. The preset is cached automatically for subsequent calls.
+To use presets, simply pass the preset name to any ColorGrader method:
 
 ```typescript
-import { loadPreset, PRESETS } from 'web-luts';
+import { ColorGrader, PRESETS } from 'web-luts';
 
-const lut = await loadPreset(PRESETS.VINTAGE);
-console.log(lut.size);  // 17
-console.log(lut.title); // 'vintage'
+// Initialize with a preset
+ColorGrader.init({ mode: PRESETS.VINTAGE });
+
+// Or apply to specific images
+ColorGrader.apply({ 
+  target: document.getElementById('hero'),
+  mode: PRESETS.CINEMATIC 
+});
+
+// Or switch presets dynamically
+ColorGrader.setMode(PRESETS.SCI_FI);
 ```
 
-<ParamField path="name" type="PresetName" required>
-  The preset name to load. Use values from the `PRESETS` constant.
-</ParamField>
+## Preset Values
 
-**Returns:** `Promise<ParsedLut>` - The loaded LUT data structure
-
-**Features:**
-- Automatically caches loaded presets for performance
-- Falls back to programmatic generation if preset file fails to load
-- Uses identity LUT as ultimate fallback for errors
-
-### isValidPreset()
-
-Checks if a given string is a valid preset name.
+You can access preset string values directly:
 
 ```typescript
-import { isValidPreset } from 'web-luts';
-
-console.log(isValidPreset('vintage'));    // true
-console.log(isValidPreset('custom'));     // false
-console.log(isValidPreset('CINEMATIC'));  // false (case-sensitive)
+console.log(PRESETS.NORMAL);          // 'normal'
+console.log(PRESETS.VINTAGE);         // 'vintage'
+console.log(PRESETS.CINEMATIC);       // 'cinematic'
+console.log(PRESETS.SERIOUS_VINTAGE); // 'serious-vintage'
+console.log(PRESETS.LIGHTS_OUT);      // 'lights-out'
+console.log(PRESETS.SCI_FI);          // 'sci-fi'
 ```
 
-<ParamField path="name" type="string" required>
-  The string to validate as a preset name.
-</ParamField>
-
-**Returns:** `boolean` - Whether the name is a valid preset (also serves as a type guard)
-
-### preloadAllPresets()
-
-Preloads all preset LUTs in the background for instant access later. Useful for improving performance when you know presets will be used.
-
-```typescript
-import { preloadAllPresets } from 'web-luts';
-
-// Preload all presets on app initialization
-preloadAllPresets();
-
-// Later, presets load instantly from cache
-const lut = await loadPreset(PRESETS.CINEMATIC);
-```
-
-**Returns:** `void`
-
-**Note:** Errors during preloading are caught and logged internally. This function does not block or throw errors.
-
-## Complete Example
-
-```typescript
-import { PRESETS, loadPreset, isValidPreset, preloadAllPresets } from 'web-luts';
-
-// Preload all presets on app start
-preloadAllPresets();
-
-// Validate user input
-const userPreset = getUserSelection();
-if (!isValidPreset(userPreset)) {
-  console.error('Invalid preset selected');
-  return;
-}
-
-// Load and apply the preset
-const lut = await loadPreset(userPreset);
-
-// Apply to canvas (see applyLutToCanvas documentation)
-applyLutToCanvas(sourceCanvas, targetCanvas, lut);
-```
-
-## Type Definitions
-
-```typescript
-type PresetName = 
-  | 'normal'
-  | 'vintage'
-  | 'cinematic'
-  | 'serious-vintage'
-  | 'lights-out'
-  | 'sci-fi';
-
-interface ParsedLut {
-  size: number;
-  data: Float32Array;
-  title?: string;
-}
-```
+<Tip>
+  Using the `PRESETS` constant provides autocomplete support and prevents typos. You can also use the string values directly (e.g., `'vintage'`), but the constant is recommended for better developer experience.
+</Tip>

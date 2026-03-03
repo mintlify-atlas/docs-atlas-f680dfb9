@@ -30,17 +30,15 @@ The `ParsedLut` interface represents a parsed LUT (Look-Up Table) used for color
 ## Usage Example
 
 ```typescript
-import { parseCubeFile, type ParsedLut } from 'web-luts';
+import { type ParsedLut } from 'web-luts';
 
-const cubeContent = `
-TITLE "My Custom LUT"
-LUT_3D_SIZE 17
-0.0 0.0 0.0
-...
-`;
+// ParsedLut is typically used when working with the apply() method's lut option
+// However, you generally don't need to construct this manually - use loadCustomCube() instead
 
-const lut: ParsedLut = parseCubeFile(cubeContent);
-console.log(lut.size);  // 17
-console.log(lut.title); // "My Custom LUT"
-console.log(lut.data.length); // 4913 (17³)
+// Type annotation example
+function processLut(lut: ParsedLut) {
+  console.log(lut.size);  // 17
+  console.log(lut.title); // "My Custom LUT"
+  console.log(lut.data.length); // Size varies based on LUT dimensions
+}
 ```

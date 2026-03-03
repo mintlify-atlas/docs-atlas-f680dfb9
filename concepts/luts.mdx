@@ -175,31 +175,36 @@ export function createIdentityLut(size = 17, title = "Identity"): ParsedLut {
 
 ## Loading LUTs
 
-Web LUTs provides multiple ways to load LUT data:
+Web LUTs provides a simple public API for loading LUT data:
 
-### From URL
+### Using ColorGrader.loadCustomCube()
 
-```typescript
-import { loadCubeFromUrl } from 'web-luts/core';
-
-const lut = await loadCubeFromUrl('/luts/my-custom-look.cube');
-```
-
-### From Text Content
+The primary way to load custom LUTs is through the `loadCustomCube()` method:
 
 ```typescript
-import { parseCubeFile } from 'web-luts/core';
+import { ColorGrader } from 'web-luts';
 
+// Load from URL
+const handle = await ColorGrader.loadCustomCube('/luts/my-custom-look.cube');
+
+// Or load from raw text content
 const cubeText = await fetch('/luts/vintage.cube').then(r => r.text());
-const lut = parseCubeFile(cubeText);
+const handle = await ColorGrader.loadCustomCube(cubeText);
+
+// Use the loaded LUT
+ColorGrader.setMode(handle);
 ```
+
+See the [loadCustomCube API documentation](/api/load-custom-cube) for more details.
 
 ### Using Built-in Presets
 
-```typescript
-import { loadPreset } from 'web-luts/presets';
+For built-in presets, simply use the preset name:
 
-const cinematicLut = await loadPreset('cinematic');
+```typescript
+import { ColorGrader, PRESETS } from 'web-luts';
+
+ColorGrader.init({ mode: PRESETS.CINEMATIC });
 ```
 
 ## The ParsedLut Interface

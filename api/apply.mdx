@@ -94,14 +94,15 @@ await ColorGrader.apply({
 ### Apply Custom LUT Directly
 
 ```javascript
-import { parseCubeFile } from 'web-luts';
+import { ColorGrader } from 'web-luts';
 
-const cubeData = await fetch('/my-lut.cube').then(r => r.text());
-const lut = parseCubeFile(cubeData);
+// First load the custom LUT
+const handle = await ColorGrader.loadCustomCube('/my-lut.cube');
 
+// Then apply it
 await ColorGrader.apply({ 
   target: '#hero-image',
-  lut: lut,
+  mode: handle,
   strength: 0.9
 });
 ```
